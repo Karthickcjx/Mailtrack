@@ -45,7 +45,7 @@
   window.__ttProbe = () => {
     const report = window.__P2_REPORT ? JSON.parse(window.__P2_REPORT()) : null;
     const btns = [...document.querySelectorAll('.tracklet-compose-btn')].map((b) => ({ text: b.textContent, compose: b.closest('.M9')?.id }));
-    const marks = [...document.querySelectorAll('.tracklet-mark')].map((m) => ({ id: m.dataset.threadId, text: m.textContent }));
+    const marks = [...document.querySelectorAll('.tracklet-mark')].map((m) => ({ id: m.dataset.trackletThreadId, text: m.textContent }));
     return { report, buttons: btns, marks, panelPresent: Boolean(document.getElementById('tracklet-p2-panel')),
       panelLines: document.querySelectorAll('#tracklet-p2-panel .tracklet-p2-line').length };
   };

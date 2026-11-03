@@ -11,6 +11,8 @@ export const SELECTORS = {
   inlineAncestor: '.AO',                       // inline (reply/forward) composes live inside the main pane
   peopleKitChip: (f: string) => `div[name=${f}] [data-hovercard-id]`,
   legacyRecipient: (f: string) => `.GS input[type=hidden][name=${f}]`,
+  // Text typed into a recipient field but not yet committed as a chip (Gmail still sends to it).
+  recipientInput: (f: string) => `div[name=${f}] input:not([type=hidden])`,
   subjectBox: 'input[name=subjectbox]',
   subjectHidden: 'input[name=subject]',
   composeId: 'input[name=composeid]',
@@ -18,20 +20,29 @@ export const SELECTORS = {
   attachment: 'div.dL',
   sendRow: '.gU.Up',
   threadRow: 'tr.zA',
-  rowLegacyId: '[data-legacy-thread-id]',
-  rowThreadId: '[data-thread-id]',
+  // Exclude Tracklet's own elements so our marks can never be mistaken for Gmail's ID carriers.
+  rowLegacyId: '[data-legacy-thread-id]:not(.tracklet-mark)',
+  rowThreadId: '[data-thread-id]:not(.tracklet-mark)',
   rowMarkTarget: 'td.yX, td.xY',
   openThreadHeading: 'h2[data-legacy-thread-id]',
 } as const;
 
 const FIELDS = ['to', 'cc', 'bcc'] as const;
 
+/** Email-shaped tokens in free text such as "a@x.com, B <b@y.org>; c@z.net" (validated later by normalizeRecipients). */
+export function emailsInText(text: string): string[] {
+  return text.match(/[^\s<>,;"'()]+@[^\s<>,;"'()]+/g) ?? [];
+}
+
 function readRecipients(root: Element) {
   const raw: Record<string, string[]> = { to: [], cc: [], bcc: [] };
   for (const f of FIELDS) {
     const chips = [...root.querySelectorAll(SELECTORS.peopleKitChip(f))].map((e) => e.getAttribute('data-hovercard-id') ?? '');
     const legacy = [...root.querySelectorAll<HTMLInputElement>(SELECTORS.legacyRecipient(f))].map((e) => e.value);
-    raw[f] = chips.length ? chips : legacy;
+    // P2 round 7 (live Gmail): addresses typed with commas but never committed stay as raw text in the
+    // field's input, yet Gmail still treats them as recipients. Include them so none is missed.
+    const typed = [...root.querySelectorAll<HTMLInputElement>(SELECTORS.recipientInput(f))].flatMap((e) => emailsInText(e.value));
+    raw[f] = [...(chips.length ? chips : legacy), ...typed];
   }
   return normalizeRecipients(raw);
 }
@@ -140,10 +151,16 @@ export class NativeDomAdapter implements GmailUiAdapter {
         mark.style.cssText = 'color:#188038;font-weight:600;margin:0 4px;font-size:12px';
         target.prepend(mark);
       }
-      mark.dataset.threadId = id;
-      mark.dataset.state = state ?? 'unknown';
-      mark.textContent = state === 'likely_opened' || state === 'clicked' ? '✓✓' : '✓';
-      mark.title = `Tracklet: ${state ?? 'no data'}`;
+      // data-tracklet-* only: a plain data-thread-id here would be re-read as Gmail's ID on the next repaint.
+      // Write ONLY when a value changes: unconditional writes on every 1.5 s repaint generated
+      // ~4 mutation records per row per cycle and woke our own document-wide observer (P2 round 7, live Gmail).
+      const text = state === 'likely_opened' || state === 'clicked' ? '✓✓' : '✓';
+      const stateAttr = state ?? 'unknown';
+      const title = `Tracklet: ${state ?? 'no data'}`;
+      if (mark.dataset.trackletThreadId !== id) mark.dataset.trackletThreadId = id;
+      if (mark.dataset.trackletState !== stateAttr) mark.dataset.trackletState = stateAttr;
+      if (mark.textContent !== text) mark.textContent = text;
+      if (mark.title !== title) mark.title = title;
     });
     this.rowStats = { rows, withId, totalMarks: this.doc.querySelectorAll('.tracklet-mark').length };
   }
