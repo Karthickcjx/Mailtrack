@@ -1,0 +1,68 @@
+{
+  "_note": "Live Gmail P2 report, native-dom harness, captured by Claude via browser automation on 2026-11-03. Thread IDs replaced with placeholders (thread-N); email local parts redacted by the harness (p***@example.com are synthetic RFC 2606 addresses). Browser UA string reported Chrome/156.0.0.0 (user stated the browser is Edge; the UA had no Edg/ token).",
+  "schema": "tracklet-p2-report/2",
+  "harness": "P2",
+  "variant": "native",
+  "buildId": "native-aeafee4d9bfd",
+  "adapter": "native-dom",
+  "browser": "Chrome/156.0.0.0",
+  "startedAt": "2026-11-03T14:04:39.926Z",
+  "reportedAt": "2026-11-03T14:11:05.973Z",
+  "coverage": {
+    "automated": [
+      { "id": "P2.9-load", "label": "Adapter loaded", "evidence": "PRESENT" },
+      { "id": "P2.5-new", "label": "New compose detected + buttons", "evidence": "PRESENT" },
+      { "id": "P2.5-reply", "label": "Reply compose detected", "evidence": "PRESENT" },
+      { "id": "P2.5-forward", "label": "Forward compose detected", "evidence": "PRESENT" },
+      { "id": "P2.6-to-cc-bcc", "label": "Read with To, Cc and Bcc all non-empty", "evidence": "PRESENT" },
+      { "id": "P2.6-unicode-subject", "label": "Read with non-ASCII subject", "evidence": "PRESENT" },
+      { "id": "P2.6-body", "label": "Read with non-empty body", "evidence": "PRESENT" },
+      { "id": "P2.6-signature", "label": "Read with signature detected", "evidence": "MISSING" },
+      { "id": "P2.6-attachment", "label": "Read with attachment detected", "evidence": "PRESENT" },
+      { "id": "P2.7-close", "label": "Close issued (check Drafts manually)", "evidence": "PRESENT" },
+      { "id": "P2.8-sent", "label": "Row IDs + marks in Sent", "evidence": "PRESENT" },
+      { "id": "P2.8-inbox", "label": "Row IDs + marks in Inbox", "evidence": "PRESENT" },
+      { "id": "P2.8-search", "label": "Row IDs + marks in search results", "evidence": "PRESENT" },
+      { "id": "P2.11-view-thread", "label": "Thread-view events (>= 3 distinct)", "evidence": "PRESENT" },
+      { "id": "P2.3-hosts", "label": "No unexpected hosts after 60 s", "evidence": "PRESENT" },
+      { "id": "P2.10-tt", "label": "No Trusted Types violations after 60 s", "evidence": "PRESENT" },
+      { "id": "P2.12-no-errors", "label": "No uncaught harness errors (this page load)", "evidence": "PRESENT" }
+    ],
+    "missing": ["P2.6-signature"],
+    "manual": [
+      { "check": "P2.7 Draft present in Drafts after \"P2: Close\" (yes/no)", "evidence": "MANUAL — report separately" },
+      { "check": "P2.12 10 reloads + Inbox<->Sent switching without red page.js errors", "evidence": "MANUAL — report separately" },
+      { "check": "P2.3 DevTools Network filter shows no non-Google requests", "evidence": "MANUAL — report separately" }
+    ]
+  },
+  "results": [
+    { "id": "P2.9 load", "status": "PASS", "at": "2026-11-03T14:04:39.926Z", "detail": { "variant": "native", "adapter": "native-dom", "buildId": "native-aeafee4d9bfd", "msToLoad": 0 } },
+    { "id": "P2.5 compose-detected", "status": "PASS", "at": "2026-11-03T14:05:16.558Z", "detail": { "kind": "new", "composeIdPresent": true, "view": "inbox" } },
+    { "id": "P2.5 button-injected", "status": "PASS", "at": "2026-11-03T14:05:16.559Z", "detail": { "kind": "new" } },
+    { "id": "P2.3 unexpected-hosts-60s", "status": "PASS", "at": "2026-11-03T14:05:39.930Z", "detail": {} },
+    { "id": "P2.10 trusted-types-60s", "status": "PASS", "at": "2026-11-03T14:05:39.930Z", "detail": { "violations": 0, "first": [] } },
+    { "id": "P2.6 read-fields", "status": "RECORDED", "at": "2026-11-03T14:07:11.482Z", "detail": { "kind": "new", "to": ["p***@example.com", "p***@example.com"], "cc": ["p***@example.com"], "bcc": ["p***@example.com"], "subject": "P2 Résumé ✓ 測試", "htmlLength": 44, "htmlHasSignatureDiv": false, "hasAttachments": false } },
+    { "id": "P2.6 read-fields", "status": "RECORDED", "at": "2026-11-03T14:07:42.443Z", "detail": { "kind": "new", "to": ["p***@example.com", "p***@example.com"], "cc": ["p***@example.com"], "bcc": ["p***@example.com"], "subject": "P2 Résumé ✓ 測試", "htmlLength": 44, "htmlHasSignatureDiv": false, "hasAttachments": true } },
+    { "id": "P2.7 close", "status": "RECORDED", "at": "2026-11-03T14:07:51.646Z", "detail": { "kind": "new", "note": "Esc-close issued; check Drafts" } },
+    { "id": "P2.11 view_thread", "status": "RECORDED", "at": "2026-11-03T14:08:19.879Z", "detail": { "threadId": "thread-1", "view": "sent-thread" } },
+    { "id": "P2.11 view_thread", "status": "RECORDED", "at": "2026-11-03T14:09:10.537Z", "detail": { "threadId": "thread-2", "view": "sent-thread" } },
+    { "id": "P2.5 compose-detected", "status": "PASS", "at": "2026-11-03T14:09:23.187Z", "detail": { "kind": "reply", "composeIdPresent": true, "view": "sent-thread" } },
+    { "id": "P2.5 button-injected", "status": "PASS", "at": "2026-11-03T14:09:23.187Z", "detail": { "kind": "reply" } },
+    { "id": "P2.5 compose-detected", "status": "PASS", "at": "2026-11-03T14:09:52.033Z", "detail": { "kind": "forward", "composeIdPresent": true, "view": "sent-thread" } },
+    { "id": "P2.5 button-injected", "status": "PASS", "at": "2026-11-03T14:09:52.035Z", "detail": { "kind": "forward" } },
+    { "id": "P2.11 view_thread", "status": "RECORDED", "at": "2026-11-03T14:10:22.596Z", "detail": { "threadId": "thread-3", "view": "search-thread" } },
+    { "id": "P2.11 view_thread", "status": "RECORDED", "at": "2026-11-03T14:10:29.590Z", "detail": { "threadId": "thread-4", "view": "search-thread" } },
+    { "id": "P2.11 view_thread", "status": "RECORDED", "at": "2026-11-03T14:10:36.626Z", "detail": { "threadId": "thread-2", "view": "search-thread" } }
+  ],
+  "viewStats": [
+    { "view": "search", "rows": 0, "withId": 0, "totalMarks": 0, "at": "2026-11-03T14:04:42.427Z" },
+    { "view": "inbox", "rows": 50, "withId": 50, "totalMarks": 50, "at": "2026-11-03T14:04:49.962Z" },
+    { "view": "drafts", "rows": 59, "withId": 59, "totalMarks": 59, "at": "2026-11-03T14:08:04.578Z" },
+    { "view": "sent", "rows": 109, "withId": 109, "totalMarks": 109, "at": "2026-11-03T14:08:18.180Z" },
+    { "view": "sent-thread", "rows": 109, "withId": 109, "totalMarks": 109, "at": "2026-11-03T14:08:19.975Z" },
+    { "view": "search", "rows": 150, "withId": 150, "totalMarks": 150, "at": "2026-11-03T14:10:18.971Z" },
+    { "view": "search-thread", "rows": 150, "withId": 150, "totalMarks": 150, "at": "2026-11-03T14:10:25.137Z" }
+  ],
+  "ttViolations": [],
+  "unexpectedHosts": {}
+}

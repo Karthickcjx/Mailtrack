@@ -203,6 +203,83 @@ These are recorded as **manually confirmed**, not PASS. They become PASS once th
 
 **Note on what this does and doesn't prove:** gmail.js's selectors (compose root, recipient chips, subject box, `.gU.Up` send row, `tr.zA` rows) working on live Gmail is **indirect, supportive evidence** for the native adapter, which uses the same selectors. It is **not** a substitute for running `dist-native` live.
 
+### P2 round 6 (2026-11-03): native-dom live-test preparation (no live results yet)
+**Native live compatibility: NOT TESTED.** Everything below is local, automated preparation.
+
+| Item | Result | Evidence |
+|---|---|---|
+| Reproducible builds | PASS | Two consecutive builds per variant → identical `buildId` and `page.js` SHA-256 (`build.test.ts`); native `native-…`, gmail.js `gmailjs-…`; `build-info.json` records variant, sources, versions, hash and sink count |
+| Report identifies variant and build | PASS | Report `schema: tracklet-p2-report/2`, `variant`, `buildId`, `adapter`, `startedAt`; build ID also in the panel title |
+| Report coverage of every runbook check | PASS | `report.ts` `REQUIRED_CHECKS` (17 automated checks) plus 3 explicit `MANUAL` checks; an empty run reports all 17 MISSING (never PASS without evidence) |
+| Per-view row evidence (Sent / Inbox / search) | Added | `viewStats` sampled 2.5 s after each hash change and every 10 s; view names carry no thread IDs or search terms |
+| Uncaught harness errors per page load (P2.12) | Added | `isOwnError` filter ignores Gmail's own errors |
+| Copy-results fallback | Added | Report always logged to the Console; button shows "Copy blocked: … run copy(__P2_REPORT())" |
+| **Bug found and fixed in the native adapter** (`extension/src/gmail/native-adapter.ts`) | FIXED | The mark span set `data-thread-id` on itself; on the next 1.5 s repaint `row.querySelector('[data-thread-id]')` matched our own mark (no `thread-f:` prefix) → row treated as ID-less, `withId` dropped, and the mark was never updated again. Fix: marks use `data-tracklet-thread-id` / `data-tracklet-state`, and the ID selectors exclude `.tracklet-mark`. **Negative control:** reverting reproduces `withId 1 ≠ 2` |
+| Test-runner bug fixed | FIXED | `run-tt.mjs` decoded Chrome stdout per chunk, corrupting UTF-8 split at a chunk boundary (`Résum��`); now decodes once |
+| Headless strict-TT fixture extended | PASS | Forward compose added; starts in `#sent`; asserts kinds `new/reply/forward`, buttons on all three composes, report identity, `viewStats` (3 rows, 2 IDs, 2 marks after repaint), and coverage present/missing exactly as expected |
+| Static TT checks + isolation | PASS | No `innerHTML/outerHTML =`, `insertAdjacentHTML`, `document.write`, `createPolicy` or `.html(` in the adapters, panel, harness or report; no gmail-js/jquery in `extension/ shared/ backend/`; native bundle contains no jQuery/gmail.js; both manifests have `permissions: []` and no host permissions |
+
+**Untested on live Gmail (native adapter):**
+- Whether `div.M9`, peoplekit chips, `input[name=subjectbox]`, `div.dL`, `.gU.Up`, `tr.zA` and `h2[data-legacy-thread-id]` match current Gmail markup. They worked for the gmail.js variant in round 5, which uses the same selectors and the native row-marking code, but that's indirect evidence.
+- Whether a synthetic (untrusted) Esc keydown closes the composer (the same approach as gmail.js; unverified for either).
+- The performance cost of the document-wide MutationObserver used for thread-view detection.
+
+### P2 round 7 (2026-11-03): native-dom on LIVE Gmail (automated by Claude via browser automation)
+**Tested build:** `native-aeafee4d9bfd` (`spikes/p2-gmailjs/dist-native`), loaded unpacked by you.
+**Browser:** you stated Edge with the Claude extension. The page's user agent reported `Chrome/156.0.0.0` with no `Edg/` token, so the brand is recorded as stated, not verified. Gmail account: your real account (read-mostly; see "side effects").
+**Evidence:** live tool outputs in this session, plus the redacted report JSON `spikes/p2-live/round7-native-pageload2.json` (thread IDs replaced with `thread-N`; recipients are synthetic `@example.com`).
+**Synthetic vs live:** every row below marked LIVE ran on real Gmail. The FIXED rows were reproduced on live Gmail, fixed, and verified **only on the synthetic fixture** so far (they need a re-run with the new build).
+
+| # | Runbook step / check | Result | Live evidence |
+|---|---|---|---|
+| 2 | P2.9 load; panel identifies `native` + build ID | **PASS (LIVE)** | Panel `P2 harness (native) native-aeafee4d9bfd`; report `schema tracklet-p2-report/2`, `variant native`, `adapter native-dom` |
+| 3 | P2.8 Inbox / Sent / search rows + marks | **PASS (LIVE)** | 50/50/50 visible rows, every row ID'd and marked, 0 duplicates, 0 marks carrying Gmail ID attributes, all marks use `data-tracklet-thread-id` / `data-tracklet-state`, IDs stable across repaints (checked about 7 s after load) |
+| 4 | P2.11 thread-view events (3 distinct, view-tagged) | **PASS (LIVE)** | 4 distinct thread IDs; views `sent-thread` / `search-thread` |
+| 5 | P2.5 new compose + buttons | **PASS (LIVE)** | `kind: new`, "P2: Read" / "P2: Close" next to Send |
+| 5 | P2.6 To/Cc/Bcc (committed chips) | **PASS (LIVE)** | to 2, cc 1, bcc 1 (read while the recipient area was collapsed) |
+| 5 | P2.6 To/Cc/Bcc (addresses typed with commas, not committed) | **FAIL (LIVE) → FIXED** | Adapter read 0/0/0 while Gmail's own summary showed "p2-to1@example.com · 3 more (1 Bcc)". Root cause: only chips (`[data-hovercard-id]`) were read; uncommitted text sits in the field's `<input>`. Fix: also parse email tokens from `div[name=f] input:not([type=hidden])`. Regression: unit test `emailsInText` + fixture compose with typed recipients; negative control fails without the fix. **Live re-test pending** |
+| 5 | P2.6 Unicode subject | **PASS (LIVE)** | `P2 Résumé ✓ 測試` exact |
+| 5 | P2.6 body | **PASS (LIVE)** | `htmlLength 44` |
+| 5 | P2.6 attachment | **PASS (LIVE)** | `false` before upload, `true` after (`div.dL` present; synthetic 1 KB text file) |
+| 5 | P2.6 signature | **BLOCKED** | The account has no Gmail signature; adding one changes account settings (needs your approval or your action) |
+| 6 | P2.7 Close (synthetic Esc) + draft preserved | **PASS (LIVE)** | Composer closed (0 open); Drafts 8 → 9; draft has the subject, body and attachment |
+| 7 | P2.5 reply | **PASS (LIVE)** | `kind: reply`, inside `.AO`, hidden subject `Re: …`, 2 buttons |
+| 7 | P2.5 forward | **PASS (LIVE)** | `kind: forward`, hidden subject `Fwd: …`, 2 buttons |
+| 8 | P2.10 Trusted Types after 60 s | **PASS (LIVE)** | 0 violations on every page load (1 + 10 reloads) |
+| 8 | P2.3 unexpected hosts after 60 s (harness observer) | **PASS (LIVE)** | `{}` |
+| 10 | Network inspection (substitute for the DevTools filter: the browser tool's request log, 79 requests across reloads) | **PASS (LIVE, substitute)** | Only Google hosts: `mail.google.com`, `play.google.com`, `*.clients6.google.com` (peoplestack-pa, taskassist-pa, appsgrowthpromo-pa, subscriptionsfirstparty-pa), `www.google.com`, `ssl.gstatic.com`, `www.gstatic.com`. The harness made no requests. (Two 503s and a `jserror` beacon are Gmail's own.) The DevTools UI itself was not used |
+| 11 | 10 full reloads alternating Inbox / Sent | **PASS (LIVE)** | Each reload got a new `startedAt` (14:13:33 → 14:15:23); every load: correct build, P2.9 PASS, 0 harness errors, 0 TT violations, 50/50 rows marked, 0 duplicates. (An earlier 10-step attempt with `navigate` only changed the hash, `startedAt` unchanged, so it's counted as navigation, **not** reloads) |
+| — | Compose detection after reloads | **PASS (LIVE)** | `new` detected with 2 buttons after reload 10 |
+| — | P2.12 harness uncaught errors | **PASS (LIVE)** | 0 on every page load |
+| — | Repaint churn / observer self-triggering | **FAIL (LIVE) → FIXED** | Idle 6 s: **0** Gmail mutations vs **800** on our own marks (50 rows × 4 writes per 1.5 s repaint: `textContent` + 3 attributes, unconditional). The childList records woke the adapter's own document-wide observer (7 callbacks / 10 s). Fix: write mark values only when they change. Regression: fixture counts mutations on marks after first paint (must be 0); negative control fails without the fix. **Live re-test pending** |
+| — | Performance | RECORDED (LIVE) | Before the fix: ≈0.085 ms CPU/s at idle; paintRows-equivalent 0.068 ms per pass over 50 rows; 0 long tasks > 50 ms in 10 s |
+
+**Report coverage on one page load** (`round7-native-pageload2.json`): 16/17 PRESENT; MISSING only `P2.6-signature`.
+
+**Observations and limitations (not failures):**
+- `rowStats` counts every `tr.zA` in the DOM, including Gmail's hidden cached list views, so numbers accumulate across views (50 → 109 → 150). Coverage uses `withId == rows`, which still holds.
+- The diagnostic panel (bottom-left) can cover Gmail's Reply button in an open thread; a click aimed at Reply opened another thread instead. This is a harness-only layout issue.
+- The first `viewStats` sample can be `rows 0` (taken before Gmail renders); it doesn't satisfy coverage.
+- Adapter kind detection for inline composes uses the subject prefix (`Fw…` → forward). A *reply* in a thread whose subject starts with "Fwd:" could be misclassified. Not observed (the reply hidden subject was `Re: …`), but not exhaustively tested.
+
+**Side effects on your mailbox (disclosed):**
+- One saved test draft remains in Drafts (subject `P2 Résumé ✓ 測試`, synthetic `@example.com` recipients, 1 KB synthetic attachment). **Not deleted:** deleting a draft is permanent, so please delete it yourself.
+- Two empty reply/forward composers were discarded (never saved as drafts).
+- Opened threads were from Sent / `in:sent` except one: an accidental navigation opened one real conversation (labels Inbox + Sent; subject withheld). If it contained an unread message, it is now marked read.
+- Nothing was sent; no settings were changed.
+
+**Rebuilt after the fixes:** `native-17464e23d75d`.
+
+#### Round 7b (2026-11-03): live re-test of the two fixes, build `native-17464e23d75d` (reloaded by you)
+| Check | Result | Live evidence |
+|---|---|---|
+| Panel / report identify the new build | **PASS (LIVE)** | `P2 harness (native) native-17464e23d75d`, P2.9 PASS, 50/50 Sent rows marked |
+| Repaint churn (fix 2) | **PASS (LIVE)** | 6 s idle: **0** mutation records on our marks (was 800 on the old build); 50/50 rows with IDs, 0 unmarked, 0 duplicates, 0 marks with Gmail ID attributes, 50/50 with `data-tracklet-*`. The remaining observer activity (8 records / 6 s) is Gmail's own |
+| Uncommitted typed recipients (fix 1) | **PASS (LIVE)** | Reproduced the original condition exactly (0 chips; raw text 38/18/19 chars in To/Cc/Bcc inputs). "P2: Read" now returns To 2, Cc 1, Bcc 1 (was 0/0/0); 0 harness errors, 0 TT violations |
+| Cleanup | Done | The synthetic compose was discarded with Gmail's "Discard draft"; Drafts shows no test drafts (you had deleted the round-7 draft) |
+
+**P2 native status after round 7b:** all automated checks PASS on live Gmail except `P2.6-signature` (BLOCKED: no signature configured on the account).
+
 ## P3 — MIME and threading
 | Test | Result | Notes |
 |---|---|---|

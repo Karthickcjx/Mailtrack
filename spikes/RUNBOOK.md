@@ -36,6 +36,27 @@ All spikes are throwaway and local. Nothing here deploys anything. Record outcom
 3. Reload Gmail. Open 20 Sent messages containing `https://<tunnel>/o/ns-p5-N.gif`, inserted as in P4. Count pixel hits vs `view` entries in the log (P5.2, P5.4). Record the proxied `src` format from the console (P5.3).
 4. P5.5: open one in the Gmail mobile app and record the hit.
 
+## P2 native-dom live test — short procedure (do this first)
+No Google Cloud project, no OAuth, no permissions. The harness never sends mail; never press Gmail's own **Send** during the test. The panel's **"missing checks N"** counter must reach **0**; the report's `coverage.missing` lists what's left.
+
+| # | Do | Satisfies |
+|---|---|---|
+| 0 | `cd D:\projects\Mailtrack` → `node spikes/p2-gmailjs/build.mjs native`. Note the printed build ID (`native-xxxxxxxxxxxx`) | — |
+| 1 | In the **Tracklet test** profile at `chrome://extensions`: remove every "Tracklet P2 spike", then **Load unpacked** `spikes\p2-gmailjs\dist-native` | — |
+| 2 | Open `https://mail.google.com/mail/u/0/#inbox`. Press F12 and open the Console. The panel (bottom-left) title must show the **same build ID** | P2.9-load |
+| 3 | Stay on **Inbox** for 5 s, open **Sent** for 5 s, then search `in:sent` (or any term) and wait 5 s | P2.8-inbox / -sent / -search |
+| 4 | Open **3 different** conversations (back to the list between each) | P2.11-view-thread |
+| 5 | Click **Compose**. To: 2 addresses, click **Cc** and **Bcc** and add 1 each (your own test addresses). Subject: `P2 Résumé ✓ 測試`. Type a line of body text (signature must be visible). Attach any small file. Wait until the upload finishes, then click **P2: Read** | P2.5-new, P2.6-* (all five) |
+| 6 | In the same compose click **P2: Close**, then open **Drafts** and note whether the draft is there (manual check) | P2.7-close + manual |
+| 7 | Open a received conversation → **Reply** (P2.5 line appears), then discard it. Then **Forward** (P2.5 line appears), then discard it | P2.5-reply, P2.5-forward |
+| 8 | Wait until at least **60 s** after step 2 | P2.3-hosts, P2.10-tt |
+| 9 | Click **Copy results** (or, if it says "Copy blocked", run `copy(__P2_REPORT())` in the Console) and save the JSON | report |
+| 10 | Manual: in the Network tab, filter `-domain:*.google.com -domain:*.gstatic.com -domain:*.googleusercontent.com -domain:*.googleapis.com` and note anything left | manual P2.3 |
+| 11 | Manual: reload Gmail 10× (switching Inbox ↔ Sent) and note any red Console errors mentioning `page.js` | manual P2.12 |
+| 12 | Delete the test draft(s). Remove the extension | — |
+
+Send back: the JSON (step 9), the Drafts answer (step 6), the network answer (step 10), the reload answer (step 11), and `chrome://version` → Google Chrome version.
+
 ## P2 runtime — gmail.js harness (no Google Cloud project, no OAuth, sends nothing)
 The harness has **no permissions**, makes **no network requests**, and its buttons only *read* the composer or *close* it (Esc). It never sends.
 1. Build both variants:
