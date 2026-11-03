@@ -44,7 +44,9 @@ The harness has **no permissions**, makes **no network requests**, and its butto
    
    Remove any older "Tracklet P2 spike" from chrome://extensions first (the round-2 `dist/` build is the one that failed).
 2. In the dedicated test profile, **Load unpacked** one variant at a time and run steps 3–13 for each. The panel title shows `(native)` or `(gmailjs)`. Expectation: `P2.10 trusted-types-60s` = PASS with 0 violations; if not, copy the `ttViolations` entries.
-3. Open https://mail.google.com (account A) and open DevTools (F12) → Console and Network tabs. A small "P2 gmail.js harness" panel appears bottom-left.
+3. Open https://mail.google.com (account A) and open DevTools (F12) → Console and Network tabs. A small "P2 harness (native)" or "P2 harness (gmailjs)" panel appears bottom-left (gmail.js variant: up to about 15 s).
+
+> **Status after round 5 (gmail.js variant):** steps 4, 5 and 11 (harness part) were reported PASS; steps 6 (recipients/subject only) and 9 (row IDs only) were manually confirmed. **Still to do:** step 6 attachment and signature cases, steps 7, 8, 9 (marks in Sent/Inbox/search), 10, 11 (DevTools filter), 12 and 13 (Copy-results JSON) for gmail.js, and **all steps for `dist-native`**.
 4. **P2.9 load / P2.10 Trusted Types:** within about 10 s the panel shows `PASS P2.9 load`. Note any `P2.10 trusted-types` line, and any red console errors mentioning `TrustedHTML` or `gmail.js`.
 5. **P2.5 compose detection + button:** click Compose. Expect `PASS P2.5 compose-detected` and two buttons, **"P2: Read"** and **"P2: Close"**, next to Send.
 6. **P2.6 reading fields:** in that compose, enter:

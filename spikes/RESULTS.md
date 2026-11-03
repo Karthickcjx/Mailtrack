@@ -118,6 +118,91 @@ Original recommendation:
 3. Never use gmail.js UI helpers, never create Trusted Types policies, never use HTML sinks. This is enforced by the static tests in `tt/tt.test.ts`.
 4. The extension-hosted compose page remains the fallback if live Gmail breaks the selectors.
 
+### P2 round 4 (2026-11-03): gmail.js variant initialization failure
+**Reported by you (live Gmail, Chrome 156, `dist-gmailjs`):** `[P2] P2.9 load FAIL TypeError: this.gmail.observe.on_load is not a function`; the P2 panel never appeared.
+
+**Root cause:**
+1. **Wrong API (my error).** `spikes/p2-gmailjs/gmailjs-adapter.ts` `ready()` called `this.gmail.observe.on_load(cb)`. That method **does not exist** in the installed gmail.js **1.1.16**: zero occurrences of `on_load` in `node_modules/gmail-js/src/gmail.js` or `gmail.d.ts`. It was the only `on_load` usage in the repo. The verified readiness API is the **event** `gmail.observe.on('load', callback)`:
+   - `gmail.d.ts:813`: `on(action: "load", callback: () => void): void;`
+   - README: "**load** - When the gmail interface has finished loading"
+   - Implemented in `gmail.js:2728` (`else if(action === "load")`). It calls back immediately if `api.dom.inbox_content()` (`div[role=main]`) exists; otherwise it polls every 200 ms ×50, then fires anyway after 5 s. So registering late is safe.
+2. **Panel never shown (harness bug).** The gmail.js variant runs at `document_start`, before `<body>` exists. The TypeError rejected synchronously, so the only `record()` happened while `document.body` was null (`render()` no-ops), and nothing re-rendered later.
+
+**Other gmail.js calls re-verified against the installed source:** `observe.on` (2326), `observe.off` (2384), `new.get.thread_id` / `get.thread_id`, `dom.inbox_content`; compose methods `id`, `recipients`, `subject`, `body`, `attachments`, `close`, `$el`; the compose observer invokes `callback(match, match.type())` (2573), matching the adapter's `(compose, type)`.
+
+**Changes (gmail.js stays isolated in `spikes/`; native adapter and `extension/` unchanged, `git diff extension/` empty):**
+- `gmailjs-adapter.ts`: `ready()` uses `observe.on('load', …)`, with an explicit mismatch error if `observe.on` is missing. Added a typed `GmailJsApi` interface of the verified surface. gmail.js and the marks are injectable via the constructor, for tests.
+- `harness.ts`: re-renders the panel on `DOMContentLoaded`, so early results and failures are visible.
+
+**Regression tests:**
+| Test | Result |
+|---|---|
+| Unit (strict fake that throws on any unverified member): `ready()` registers exactly `'load'` and resolves only when it fires | PASS |
+| Unit: `ready()` never touches `observe.on_load` | PASS |
+| Unit: clear error when the API doesn't match | PASS |
+| Unit: `onCompose` registers `'compose'` and maps `(compose,'reply')` to a handle with a correct snapshot; disposer calls `off('compose')` | PASS |
+| Unit: `onThreadViewed` registers `'view_thread'` and reads `new.get.thread_id()` | PASS |
+| Contract with the installed package: version 1.1.16; typings declare `load`/`compose`/`view_thread`; source implements `load`; no `on_load` in package or adapter | PASS (4) |
+| **Negative control:** restoring `observe.on_load` in the adapter | 3 tests FAIL as intended; restored → 9/9 PASS |
+| Headless Chrome, strict TT, real gmail.js 1.1.16 + jQuery 4.0.0, synthetic shell with `div[role=main]`: constructs, `ready()` resolves (2 ms), compose and view_thread register | PASS (0 violations, 0 errors) |
+| Control: same bundle **without** `div[role=main]` → `ready: false` within the 1.5 s window | As expected (proves it waits for gmail.js's load check) |
+| Full check: typecheck (incl. spikes), **44/44 tests**, build, secret scan (0 findings), isolation tests | PASS |
+| Rebuilt `dist-native` (13 KB, 0 sinks) and `dist-gmailjs` (361 KB, 2 jQuery-internal sink sites, 0 `on_load`) | Built |
+
+**Live Gmail status: NOT CONFIRMED.** Needs your re-test of both variants.
+
+### P2 round 5 (2026-11-03): live Gmail results for the gmail.js variant (reported by you)
+Environment: Chrome 156 (exact build not supplied), live Gmail, `dist-gmailjs` (gmail.js 1.1.16 + jQuery 4.0.0, built after the round-4 fix).
+Evidence type: **values transcribed by you** in your message. The harness's **Copy results** JSON was **not supplied**, so nothing below is backed by a machine-recorded artefact in this repo.
+
+**A. Live results with reported values (confirmed by your supplied results)**
+| Test | Result | Reported value |
+|---|---|---|
+| P2.9 load (gmail.js initialises via `observe.on('load')`) | **PASS** | 2,345 ms |
+| P2.5 compose detection | **PASS** | — |
+| P2.5 button injection (DOM-built "P2: Read" / "P2: Close") | **PASS** | — |
+| P2.3 unexpected hosts after 60 s (harness PerformanceObserver) | **PASS** | 0 hosts |
+| P2.10 Trusted Types violations after 60 s (passive observer) | **PASS** | 0 violations |
+| P2.6 field reading (recipients and subject) | **PASS** (reported as working) | No per-compose details supplied |
+
+**B. Confirmed manually, without machine-recorded evidence**
+| Test | Status | Missing evidence |
+|---|---|---|
+| P2.6 To/Cc/Bcc split (de-duplicated, lower-cased) | Manually confirmed | Copy-results JSON with redacted `to/cc/bcc` arrays |
+| P2.6 Unicode subject `P2 Résumé ✓ 測試` | Manually confirmed | JSON `subject` field |
+| P2.8 Gmail row detection and thread IDs | Manually confirmed | Panel `rows {rows, withId, totalMarks}` values and which views (Sent/Inbox/search) |
+
+These are recorded as **manually confirmed**, not PASS. They become PASS once the JSON is attached.
+
+**C. Not yet performed or not reported (no PASS claimed)**
+| Runbook step | Test | Status |
+|---|---|---|
+| 6 | 10 composes incl. **attachment** (`hasAttachments`) and **signature** (`htmlHasSignatureDiv`); last address not yet a chip | NOT PERFORMED / NOT REPORTED |
+| 7 | **P2.7 draft preservation** after "P2: Close" (Esc): does a draft remain in Drafts? | NOT PERFORMED / NOT REPORTED |
+| 8 | **Reply / forward** detection (`kind` = `reply` / `forward`) | NOT PERFORMED / NOT REPORTED |
+| 9 | **P2.8 ✓ marks** visible in **Sent, Inbox and search**; `withId == rows`; after 5 folder switches | NOT PERFORMED / NOT REPORTED (only "row detection and IDs work") |
+| 10 | **P2.11 thread view** events (3 threads → 3 `view_thread` IDs) | NOT PERFORMED / NOT REPORTED |
+| 12 | **10 Gmail reloads** plus Inbox ↔ Sent switching without uncaught `page.js` errors | NOT PERFORMED / NOT REPORTED |
+| 11 | **DevTools Network filter** check (independent of the harness observer) | NOT PERFORMED / NOT REPORTED |
+| 2–13 | **Entire native-dom variant (`dist-native`) on live Gmail** | **NOT PERFORMED** |
+| 13 | Copy-results JSON for either variant | NOT SUPPLIED |
+
+**D. Adapter comparison with the evidence available**
+| Criterion | native-dom (primary) | gmail.js 1.1.16 + jQuery 4.0.0 (experimental) |
+|---|---|---|
+| Live Gmail load / TT / network | **No live data yet** | PASS (2,345 ms; 0 TT violations; 0 unexpected hosts) |
+| Live compose detection, buttons, field reads | **No live data yet** | PASS / manually confirmed |
+| Strict-TT headless tests (synthetic fixtures) | PASS: full flow (panel, compose, fields, marks, view) | PASS: load and observer registration |
+| Bundle size | 13 KB | 361 KB |
+| HTML-sink sites in bundle | 0 | 2 (jQuery internals; reached only if markup is passed, which our code never does) |
+| Dependencies | None | gmail.js (last release 2025-01) + jQuery 4 (combination untested upstream) |
+| Gmail-change exposure | Own `SELECTORS` table (derived from gmail.js's selectors) | gmail.js internals + XHR/embedded-data parsing |
+| Load timing | `document_idle`; DOM-ready | `document_start` required; ~2.3 s to `load` live |
+
+**Decision:** **native-dom stays the production primary adapter.** The live evidence shows gmail.js *can* run safely under Gmail's Trusted Types with jQuery 4. That validates the isolated experimental candidate; it doesn't show native-dom is deficient, because native-dom hasn't been live-tested yet. Nothing in the evidence justifies changing D12. Re-evaluate only if the native live run fails where gmail.js succeeds. gmail.js and jQuery remain isolated under `spikes/` (verified by isolation tests, see below).
+
+**Note on what this does and doesn't prove:** gmail.js's selectors (compose root, recipient chips, subject box, `.gU.Up` send row, `tr.zA` rows) working on live Gmail is **indirect, supportive evidence** for the native adapter, which uses the same selectors. It is **not** a substitute for running `dist-native` live.
+
 ## P3 — MIME and threading
 | Test | Result | Notes |
 |---|---|---|
@@ -171,7 +256,7 @@ Original recommendation:
 |---|---|
 | Phase 0 | PASS (manual unpacked-load confirmation pending) |
 | P1 | BLOCKED: OAuth client |
-| P2 | InboxSDK FAIL (rejected). **gmail.js + jQuery 3.7.1 FAIL under Trusted Types** (root cause: jQuery 3 load-time `innerHTML` feature tests). Native DOM adapter PASS under strict TT (synthetic fixture); gmail.js + jQuery 4 loads cleanly. Live Gmail BLOCKED (manual, both variants) |
+| P2 | InboxSDK FAIL (rejected). **gmail.js + jQuery 3.7.1 FAIL under Trusted Types** (root cause: jQuery 3 load-time `innerHTML` feature tests). Native DOM adapter PASS under strict TT (synthetic fixture). **Live gmail.js variant (round 5, reported): load / compose / buttons / TT 0 / hosts 0 PASS; field reads and row IDs manually confirmed.** Remaining live gaps: drafts, attachments/signature, reply/forward, marks across views, thread view, 10 reloads, DevTools network, **entire native-dom live run** |
 | P3 | Offline PASS; live BLOCKED (P1) |
 | P4 | Harness PASS; tests BLOCKED (manual Gmail) |
 | P5 | Harness ready; BLOCKED (manual Gmail) |
