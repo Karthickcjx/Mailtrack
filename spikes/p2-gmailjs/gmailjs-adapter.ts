@@ -9,21 +9,52 @@ import type { ComposeHandle, ComposeSnapshot, GmailUiAdapter, ThreadMarkState } 
 import { normalizeRecipients, toComposeKind } from '../../extension/src/gmail/map';
 import { NativeDomAdapter, SELECTORS } from '../../extension/src/gmail/native-adapter';
 
+/**
+ * The subset of the gmail.js 1.1.16 API this adapter uses. Verified against the installed package
+ * (node_modules/gmail-js/src/gmail.js + gmail.d.ts), see spikes/RESULTS.md P2 round 4:
+ *  - readiness is the EVENT  observe.on('load', cb)   (there is no observe.on_load in 1.1.16)
+ *  - observe.on('compose', (compose, type) => …)      type ∈ 'compose' | 'reply' | 'forward'
+ *  - observe.on('view_thread', (domThread) => …)
+ *  - observe.off(action?)
+ *  - new.get.thread_id() / get.thread_id()
+ */
+export interface GmailJsApi {
+  observe: {
+    on(action: string, callback: (...args: any[]) => unknown): unknown; // eslint-disable-line @typescript-eslint/no-explicit-any
+    off(action?: string): unknown;
+  };
+  new?: { get?: { thread_id?(): string | undefined } };
+  get?: { thread_id?(): string | undefined };
+}
+
+export function createGmailJs(): GmailJsApi {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Factory = (GmailFactory as any).Gmail ?? GmailFactory;
+  return new Factory(jQuery) as GmailJsApi;
+}
+
 export class GmailJsAdapter implements GmailUiAdapter {
   readonly name = 'gmail.js@1.1.16+jquery4';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private gmail: any;
-  private readonly marks = new NativeDomAdapter();   // row marks: DOM only
+  private readonly gmail: GmailJsApi;
+  private readonly marks: Pick<NativeDomAdapter, 'setThreadMarks' | 'dispose' | 'rowStats'>;
   get rowStats() { return this.marks.rowStats; }
 
-  constructor() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const Factory = (GmailFactory as any).Gmail ?? GmailFactory;
-    this.gmail = new Factory(jQuery);
+  /** `gmail` and `marks` are injectable for tests; production uses the real gmail.js instance and DOM marks. */
+  constructor(opts: { gmail?: GmailJsApi; marks?: GmailJsAdapter['marks'] } = {}) {
+    this.gmail = opts.gmail ?? createGmailJs();
+    this.marks = opts.marks ?? new NativeDomAdapter();   // row marks: DOM only
   }
 
   ready(): Promise<void> {
-    return new Promise((resolve) => this.gmail.observe.on_load(() => resolve()));
+    return new Promise((resolve, reject) => {
+      if (typeof this.gmail?.observe?.on !== 'function') {
+        reject(new Error('gmail.js API mismatch: observe.on is not a function'));
+        return;
+      }
+      // gmail.js handles 'load' inside observe.on(): it calls back immediately if div[role=main] exists,
+      // otherwise polls every 200 ms (50 tries) and then fires anyway after 5 s.
+      this.gmail.observe.on('load', () => resolve());
+    });
   }
 
   onCompose(handler: (c: ComposeHandle) => void): () => void {

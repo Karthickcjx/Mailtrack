@@ -78,6 +78,16 @@ d('P2.10 under strict Trusted Types (headless Chrome)', () => {
     expect(p.report.ttViolations).toEqual([]);
   }, 120_000);
 
+  it('real gmail.js 1.1.16 + jQuery 4: adapter constructs, ready() resolves via observe.on("load"), observers register', async () => {
+    const { build } = await import('esbuild');
+    const out = resolve(__dirname, '.out/gmailjs-init.js');
+    await build({ entryPoints: [resolve(__dirname, 'gmailjs-init-entry.ts')], bundle: true, format: 'iife', outfile: out, platform: 'browser', target: 'chrome120', logLevel: 'silent' });
+    const r = await runTT(out, 'gmail-shell');
+    expect(r.violations).toEqual([]);
+    expect(r.errors).toEqual([]);
+    expect(r.probe).toMatchObject({ constructed: true, ready: true, composeRegistered: true, viewThreadRegistered: true, errors: [] });
+  }, 120_000);
+
   it('gmail.js + jQuery 4 bundle loads without TT violations or uncaught errors', async () => {
     const r = await runTT(resolve(dir, 'dist-gmailjs/page.js'), 'blank');
     expect(r.violations).toEqual([]);

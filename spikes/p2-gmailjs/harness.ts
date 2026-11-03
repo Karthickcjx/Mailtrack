@@ -81,4 +81,7 @@ createAdapter()
     }, 60_000);
   })
   .catch((e) => record('P2.9 load', 'FAIL', String(e)));
+// The gmail.js variant runs at document_start, before <body> exists; render() is a no-op until then.
+// Re-render once the body is available so early results (including failures) are always visible.
 render();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, { once: true });
