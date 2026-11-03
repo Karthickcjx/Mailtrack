@@ -1,0 +1,18 @@
+{
+  "name": "@tracklet/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "db:migrate:local": "wrangler d1 migrations apply tracklet --local",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tracklet/shared": "*",
+    "hono": "^4.13.16"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261103.1",
+    "wrangler": "^4.156.2"
+  }
+}

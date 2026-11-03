@@ -1,0 +1,16 @@
+# Phase 0: LOCAL DEVELOPMENT ONLY. Nothing is deployed (no `wrangler deploy` until approved).
+name = "t"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false   # keep the workers.dev route disabled until a deployment is approved
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tracklet"
+# Placeholder ID: only the local (Miniflare) database is used in Phase 0.
+# The real ID is filled in after `wrangler d1 create` in an approved phase.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+APP_VERSION = "0.0.1"

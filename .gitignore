@@ -1,0 +1,28 @@
+# dependencies / build output
+node_modules/
+dist/
+.wrangler/
+coverage/
+*.tsbuildinfo
+
+# local config & secrets — never commit
+.env
+.env.*
+!.env.example
+.dev.vars
+*.pem
+*.key
+*.p12
+*.crx
+extension-key*.pem
+extension-key*.der
+
+# spike runtime output (logs may contain hashed request metadata)
+spikes/**/logs/
+spikes/**/*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
