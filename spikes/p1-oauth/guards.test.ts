@@ -33,3 +33,49 @@ describe('P1 harness guards', () => {
     expect(build + popup).not.toMatch(/client_secret|GOCSPX/i);
   });
 });
+
+// P1.4 regression (2026-11-03): getAccounts() is documented as "only supported on dev channel"
+// (https://developer.chrome.com/docs/extensions/reference/api/identity); on stable Chrome 156 it threw
+// "TypeError: chrome.identity.getAccounts is not a function". Only stable members may be used.
+describe('P1 harness uses only stable, documented chrome.identity APIs', () => {
+  const code = popup.replace(/\/\/.*$/gm, '');
+  const html = readFileSync(resolve(__dirname, 'popup.html'), 'utf8');
+  const STABLE_IDENTITY = new Set([
+    'getAuthToken', 'removeCachedAuthToken', 'clearAllCachedAuthTokens', 'getProfileUserInfo',
+    'launchWebAuthFlow', 'getRedirectURL', 'onSignInChanged',
+    // types
+    'TokenDetails', 'AccountStatus', 'AccountInfo', 'ProfileUserInfo', 'ProfileDetails',
+  ]);
+
+  it('every chrome.identity member referenced is on the stable allowlist', () => {
+    const used = [...code.matchAll(/chrome\.identity\.(\w+)/g)].map((m) => m[1]!);
+    expect(used.length).toBeGreaterThan(0);
+    expect(used.filter((u) => !STABLE_IDENTITY.has(u))).toEqual([]);
+  });
+
+  it('never calls dev-channel getAccounts, in any form', () => {
+    expect(code).not.toMatch(/getAccounts/);
+    expect(html).not.toMatch(/getAccounts|id="accounts"/);
+  });
+
+  it('never bypasses the chrome.identity typings with a cast', () => {
+    expect(code).not.toMatch(/chrome\.identity\s+as\s+unknown/);
+    expect(code).not.toMatch(/\(chrome\.identity\s+as\s/);
+  });
+
+  it('every popup button has a handler and every handler has a button', () => {
+    const buttons = [...html.matchAll(/<button id="([^"]+)"/g)].map((m) => m[1]).sort();
+    const handlers = [...popup.matchAll(/^\s+async (\w+)\(\)/gm)].map((m) => m[1]).sort();
+    expect(buttons).toEqual(handlers);
+  });
+
+  it('P1.4 obtains the account id from getProfileUserInfo (stable) and passes it as { account: { id } }', () => {
+    expect(code).toMatch(/getProfileUserInfo\(/);
+    expect(code).toMatch(/details\.account = \{ id: accountId \}/);
+  });
+
+  it('spike permissions are unchanged: identity + identity.email only', () => {
+    const m = build.match(/permissions:\s*\[([^\]]*)\]/);
+    expect([...(m?.[1] ?? '').matchAll(/'([^']+)'/g)].map((x) => x[1])).toEqual(['identity', 'identity.email']);
+  });
+});

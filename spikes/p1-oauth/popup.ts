@@ -29,15 +29,19 @@ const handlers: Record<string, () => Promise<void>> = {
     const t0 = performance.now(); const t = await getToken(false);
     log('P1.3 silent token', { ms: Math.round(performance.now() - t0), length: t.length, ...(await tokeninfo(t)) });
   },
-  // P1.4 — explicit account
+  // P1.4 — explicit account via STABLE APIs only.
+  // chrome.identity.getAccounts() is "only supported on dev channel" (official docs) and must not be used.
+  // Supported source of an account ID: getProfileUserInfo().id (primary account of the profile, needs
+  // identity.email), passed as getAuthToken({ account: { id } }). A manually entered ID is also accepted.
   async account() {
-    const id = (document.getElementById('acct') as HTMLInputElement).value.trim();
-    const t = await getToken(true, id || undefined); log('P1.4 token for account', { requested: id || '(default)', ...(await tokeninfo(t)) });
-  },
-  async accounts() {
-    // getAccounts may be unavailable outside dev channels; record the outcome either way.
-    try { log('accounts', await (chrome.identity as unknown as { getAccounts(): Promise<unknown> }).getAccounts()); }
-    catch (e) { log('accounts unavailable', String(e)); }
+    const typed = (document.getElementById('acct') as HTMLInputElement).value.trim();
+    const profile = await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' as chrome.identity.AccountStatus });
+    const id = typed || profile.id;
+    if (!id) { log('P1.4 no account id', { reason: 'profile has no primary account (or identity.email missing) and no id entered' }); return; }
+    const t = await getToken(true, id);
+    const info = await tokeninfo(t);
+    log('P1.4 token for account', { source: typed ? 'manual id' : 'getProfileUserInfo().id', idLength: id.length,
+      tokenEmailMatchesProfileEmail: Boolean(profile.email) && info.email === profile.email, ...info });
   },
   async profile() { log('profile user info (Chrome profile)', await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' as chrome.identity.AccountStatus })); },
   // P1.5 — drop cache, then silent again

@@ -1,7 +1,14 @@
 // Minimal Buffer shim for the browser spike (only what spikes/p3-mime/mime.ts uses).
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
+// Build the binary string in chunks: spreading every byte into one String.fromCharCode(...) call
+// overflows the call stack on large messages (~>100 KB). 0x8000 args per call is well under engine limits.
+const CHUNK = 0x8000;
+const b64 = (bytes) => {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  return btoa(bin);
+};
 class MiniBuffer {
   constructor(bytes) { this.bytes = bytes; }
   static from(v, encoding) {
