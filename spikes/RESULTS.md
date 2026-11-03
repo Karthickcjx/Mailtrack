@@ -280,6 +280,60 @@ These are recorded as **manually confirmed**, not PASS. They become PASS once th
 
 **P2 native status after round 7b:** all automated checks PASS on live Gmail except `P2.6-signature` (BLOCKED: no signature configured on the account).
 
+## P1/P3 offline readiness (2026-11-03, before any live OAuth)
+Plan: `spikes/P1-P3-PLAN.md`. **No live OAuth, no Google Cloud project yet, no emails sent.**
+| Check | Result | Evidence |
+|---|---|---|
+| Approved scopes unchanged | PASS | `shared` `OAUTH_SCOPES` = `openid`, `userinfo.email`, `gmail.send`; 2 scope tests; P1 guard test compares the spike's manifest scopes to it |
+| P1 harness guards | PASS 4/4 | scopes, no raw token in `log()`, interactive consent only in click handlers, no client secret |
+| P1 spike build (dummy client ID) | PASS | manifest scopes = 3 approved; permissions `identity`, `identity.email`; hosts `oauth2.googleapis.com`, `gmail.googleapis.com`; `key` = stable key (ID `hhejoehmmjbjahinnpgnfhfakbkhilcd`); bundle hosts only example.com (synthetic pixel), gmail.googleapis.com, oauth2.googleapis.com; no secrets; `dist` removed afterwards |
+| P3 MIME builder | PASS 9/9 | unchanged tests |
+| **Browser Buffer shim (used by the live P3 send)** | **FAIL → FIXED** | `buffer-shim.js` base64-encoded with `String.fromCharCode(...bytes)` → `RangeError: Maximum call stack size exceeded` on a 250 KB message (small and Unicode inputs matched Node). Fix: chunked encoding (0x8000 per call). Regression: `buffer-shim.test.ts` (6 tests incl. 250 KB string, a chunk-boundary case and a >300 KB full MIME message vs Node `toRaw`); negative control with the old encoder → 2 failures |
+| Live P1.1–P1.8, P3.1–P3.5 | **BLOCKED** | Need your Google Cloud project + Chrome Extension OAuth client (`SETUP_GOOGLE_CLOUD.md`), Google Chrome (not Edge), and your approval; P3 sends real emails to your own test account |
+| P3.6, P3.7, P3.8 | Not supported by the harness | Proposed: drop P3.6/P3.8 (not applicable to the MVP), reduce P3.7 to 3 timed copies (see plan §4) |
+
+## P1 live OAuth — run 1 setup (2026-11-03)
+Google Cloud: project `tracklet-personal`; Gmail API enabled (6,000 units/min/user); Google Auth Platform External / **Testing**; test user = the tracking account; scopes saved = `userinfo.email`, `openid` (non-sensitive) + `gmail.send` (sensitive), no restricted; client `tracklet-extension`, type **Chrome extension**, Item ID `hhejoehmmjbjahinnpgnfhfakbkhilcd`, Client ID `766181300541-7qb1k5fe28rr2u6mcbi6pifmetjs6leq.apps.googleusercontent.com` (public identifier; no secret exists for this type).
+
+| Check | Result | Evidence |
+|---|---|---|
+| Spike build with the real Client ID | PASS | `manifest.oauth2.client_id` = the Client ID; scopes = exactly the 3 approved (compared with `shared` `OAUTH_SCOPES`); permissions `identity`, `identity.email`; hosts `oauth2.googleapis.com`, `gmail.googleapis.com`; `key` → ID `hhejoehmmjbjahinnpgnfhfakbkhilcd`; no secrets or tokens in `dist`; `dist` gitignored |
+| Connected browser brand | RECORDED | `navigator.userAgentData.brands` = `Chromium 156`, `Google Chrome 156` (no `Edg/`): the automation browser is **Google Chrome** (the earlier "Edge" description was inaccurate) |
+| Automation of the P1 popup | **MANUAL REQUIRED** | The browser tool refuses `chrome-extension://` URLs, and `chrome.identity` exists only in extension pages, so the P1 buttons must be clicked by you. Loading an unpacked extension is also manual |
+| P1.1–P1.8 | Pending (manual) | Steps in the P1 live-run guide in the session / `spikes/P1-P3-PLAN.md` §5 |
+
+### P1.4 investigation (2026-11-03): `getAccounts` failure
+**Observed live (you, Chrome 156 stable):** `TypeError: chrome.identity.getAccounts is not a function`; "Profile info" (`getProfileUserInfo`) succeeded with the profile's email and ID.
+
+**Root cause (harness bug, mine):** `popup.ts` had a "List accounts" handler calling `chrome.identity.getAccounts()` through a type cast (`chrome.identity as unknown as { getAccounts() }`), which bypassed the typings. The official API reference (https://developer.chrome.com/docs/extensions/reference/api/identity) tags `getAccounts` **"Dev channel"** and says **"`getAccounts` is only supported on dev channel."** It doesn't exist on stable Chrome, so the call can never work for this product.
+
+**What the official docs support (stable):**
+- `TokenDetails.account` (`AccountInfo`, whose only field is `id`): "The account ID whose token should be returned. If not specified … the Sync account if there is one, or otherwise the first Google web account."
+- `getProfileUserInfo({accountStatus})` → `{ email, id }` of the **primary** account only (needs `identity.email`, which the spike already has); `id`: "A unique identifier for the account. This ID will not change for the lifetime of the account."
+- `onSignInChanged(account: AccountInfo, signedIn)` delivers an `AccountInfo` only when an account's sign-in state changes; it's not an enumeration API.
+- No stable API lists **non-primary** accounts.
+- **Not stated in the docs:** that `ProfileUserInfo.id` is valid as `AccountInfo.id` for `getAuthToken({account})`. The descriptions are identical, but this is unverified, so the live P1.4 tests it.
+
+**Classification:**
+- **P1.4a, primary account explicitly via `getProfileUserInfo().id` → `getAuthToken({account:{id}})`:** implementable with supported APIs. **Pending live run** (expect `tokenEmailMatchesProfileEmail: true`).
+- **P1.4b, a non-primary (second) account:** **BLOCKED on stable Chrome.** There's no supported way to obtain its `AccountInfo` (enumeration is dev-channel only; `onSignInChanged` only fires on sign-in changes). Not emulated. Product impact: Tracklet uses the profile's primary account; users with several accounts should use one Chrome profile per Gmail account. This matches D2/Q14 (dedicated profile).
+
+**Fix (spike only; scopes and permissions unchanged):**
+- Removed the `getAccounts` handler and its "List accounts" button.
+- P1.4 now uses the typed ID if given, otherwise `getProfileUserInfo().id`. It logs `source`, `idLength` and `tokenEmailMatchesProfileEmail`; no token is printed.
+
+**Regression tests** (`spikes/p1-oauth/guards.test.ts`, +6):
+- only allowlisted stable `chrome.identity` members are used;
+- no `getAccounts` in the code or HTML;
+- no type-cast bypass of `chrome.identity`;
+- every popup button ↔ handler pairs up;
+- P1.4 uses `getProfileUserInfo` and `{ account: { id } }`;
+- spike permissions are exactly `identity`, `identity.email`.
+
+**Negative control:** restoring the old `popup.ts`/`popup.html` from HEAD → 2 tests fail; fix restored → 16/16.
+
+**Full check:** typecheck, 84/84 tests, build, secret scan 0. Spike rebuilt with the real Client ID (scopes = 3 approved; permissions `identity`, `identity.email`); the only `getAccounts` text left in the bundle is the explanatory comment.
+
 ## P3 — MIME and threading
 | Test | Result | Notes |
 |---|---|---|
