@@ -1,0 +1,11 @@
+# SPIKE P6 — local only. Never deploy.
+name = "p6-d1-spike"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "p6-spike"
+database_id = "00000000-0000-0000-0000-000000000006"
+migrations_dir = "../../backend/migrations"
