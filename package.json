@@ -10,7 +10,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p spikes/tsconfig.json",
     "secret-scan": "node scripts/secret-scan.mjs",
     "check": "npm run typecheck && npm test && npm run build && npm run secret-scan",
     "ext:key": "node tools/extension-key.mjs"
@@ -21,6 +21,8 @@
   "devDependencies": {
     "@types/chrome": "^0.3.7",
     "@types/node": "^26.6.6",
+    "gmail-js": "1.1.16",
+    "jquery": "3.7.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.1.0"

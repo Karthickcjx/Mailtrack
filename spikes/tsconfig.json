@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["chrome", "node"],
+    "allowJs": false
+  },
+  "include": ["p1-oauth/popup.ts", "p2-gmailjs/*.ts", "p3-mime/*.ts"]
+}
