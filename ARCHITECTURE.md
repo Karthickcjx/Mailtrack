@@ -2,6 +2,8 @@
 
 Status: **REVISED DRAFT (rev 3), awaiting approval.** No code, packages, accounts, OAuth settings or deployments exist.
 
+> **Rev 6 (2026-11-03): D12 confirmed by you.** InboxSDK rejected; **gmail.js primary**, subject to live P2; the integration sits behind `extension/src/gmail/adapter.ts` (`GmailUiAdapter`); the extension-hosted compose page is the retained fallback. See §6.1.
+>
 > **Rev 5 (2026-11-03): evidence from Phase P (spikes/RESULTS.md).**
 > - **D12 updated (proposed, needs your confirmation):** InboxSDK is **rejected**. Its terms and privacy pages are unavailable (404), App ID registration is mandatory, and the shipped code sends error and event telemetry (including a SHA-256 hash of the user's email) to `api.inboxsdk.com` by default. **gmail.js (MIT, no vendor calls)** becomes the primary candidate, pending runtime spike P2.5–P2.9. Its last release is from 2025-01, so the extension-hosted compose page is promoted to a planned fallback, not just a last resort.
 > - The MIME builder design was validated offline (RFC 2047, CRLF, single-recipient copies, threading headers, injection rejection). Live Gmail behaviour is still pending P3.
@@ -283,6 +285,26 @@ The rev 1 device-cookie layer is removed: proxies don't forward cookies, and thi
 4. Keep option (a), an extension-hosted compose page, as a guaranteed fallback. It needs no Gmail DOM and can be built in Phase 3 if both libraries fail.
 
 None of the options adds paid dependencies.
+
+### 6.1 gmail.js maintenance risk and fallback design (rev 6)
+
+**Risks (evidence from P2 static review):**
+| Risk | Evidence | Mitigation |
+|---|---|---|
+| Stale releases | gmail-js 1.1.16 last published 2025-01-01 | Pin the exact version; P2 live tests on every Gmail UI change; watch the GitHub repo |
+| Relies on undocumented Gmail DOM classes (`.gU.Up`, `tr.zA`, `.GS input`, `div[data-hovercard-id]`) and embedded data | Source of `add_compose_button`, `recipients()` | All selectors stay inside the adapter; product code uses `GmailUiAdapter` only |
+| **Requires jQuery** (MIT, +~90 KB) | gmail.js constructor throws without jQuery | Accepted; bundled locally (no remote code) |
+| **Trusted Types**: gmail.js uses jQuery `.html()` (e.g. compose buttons) and has no Trusted Types policy | grep of 1.1.16 found no `trustedTypes` usage | P2.10 probes this live. If Gmail blocks it, either (a) a `default` TT policy, if Gmail's CSP allows it, or (b) build our compose button with DOM APIs and use gmail.js only for data access, or (c) fall back |
+| `recipients()` returns **emails only** (no display names) | Source | Names are not required for sending; `To:` headers use the bare address. Recorded as a UX limitation |
+| `close()` simulates **Esc**, which in Gmail normally **keeps a draft** | Source | P2.7 confirms. If a draft remains, the product shows "Draft kept — delete it from Drafts". We cannot delete drafts without the restricted `gmail.compose`/`modify` scopes |
+| Runs in the page's MAIN world | MV3 `content_scripts[].world = "MAIN"` | No extension APIs in that world; communicate with the isolated world via `window.postMessage` with a strict origin and message schema (Phase 2) |
+
+**Fallback: extension-hosted compose page (no Gmail DOM dependency)**
+- `chrome-extension://<id>/compose.html`, opened from the popup or the toolbar.
+- Fields: To/Cc/Bcc chips, subject, and a rich-text editor (choice deferred to Phase 2; must be MIT/Apache and bundled). Signature is pasted from settings.
+- Sends through the same MIME builder and Gmail API path, so per-recipient tracking is identical.
+- Loses: in-Gmail button, Sent-list marks (status lives in the dashboard), Gmail's signature/formatting tools.
+- **Trigger to switch:** any P2 live test failing in a way the adapter can't absorb, or gmail.js breaking for more than 7 days after a Gmail UI change.
 
 ---
 
