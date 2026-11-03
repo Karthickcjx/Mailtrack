@@ -30,13 +30,13 @@ document.addEventListener('securitypolicyviolation', (e) => {
   window.__tt.violations.push({ directive: e.violatedDirective, sample: (e.sample || '').slice(0, 80), line: e.lineNumber, source: (e.sourceFile || '').split('/').pop() });
 });
 window.addEventListener('error', (e) => { window.__tt.errors.push({ message: String(e.message).slice(0, 200), line: e.lineno, source: (e.filename || '').split('/').pop() }); });
-window.addEventListener('load', () => setTimeout(() => {
+window.addEventListener('load', () => setTimeout(() => {   // fixtures may set window.__ttWaitMs
   const out = document.createElement('pre');
   out.id = '__tt_result';
   const probe = window.__ttProbe ? window.__ttProbe() : {};
   out.textContent = JSON.stringify({ ...window.__tt, probe });
   document.body.appendChild(out);
-}, 1500));
+}, window.__ttWaitMs || 1500));
 `;
 
 export async function runTT(scriptPath, fixture = 'blank') {
@@ -56,10 +56,10 @@ export async function runTT(scriptPath, fixture = 'blank') {
   try {
     const dom = await new Promise((resolveP, reject) => {
       const p = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-        `--user-data-dir=${join(here, '.chrome-profile')}`, '--virtual-time-budget=5000', '--dump-dom', `http://127.0.0.1:${port}/`]);
-      let out = ''; p.stdout.on('data', (d) => { out += d; });
+        `--user-data-dir=${join(here, '.chrome-profile')}`, '--virtual-time-budget=12000', '--dump-dom', `http://127.0.0.1:${port}/`]);
+      const chunks = []; p.stdout.on('data', (d) => { chunks.push(d); });   // decode once: a chunk boundary may split a UTF-8 character
       const t = setTimeout(() => { p.kill(); reject(new Error('chrome timeout')); }, 60000);
-      p.on('close', () => { clearTimeout(t); resolveP(out); });
+      p.on('close', () => { clearTimeout(t); resolveP(Buffer.concat(chunks).toString('utf8')); });
     });
     const m = dom.match(/<pre id="__tt_result">([\s\S]*?)<\/pre>/);
     if (!m) throw new Error('no result block in dumped DOM');

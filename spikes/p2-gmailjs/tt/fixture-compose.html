@@ -18,8 +18,22 @@
       <div class="gU Up"><div role="button">Send</div></div>
     </div>
   </div>
+  <div class="AO">
+    <div class="M9" id="inline-forward">
+      <input type="hidden" name="composeid" value="fwd-1">
+      <input type="hidden" name="subject" value="Fwd: Quarterly numbers">
+      <div name="to"><span data-hovercard-id="other@example.test">other</span></div>
+      <div contenteditable="true">FYI</div>
+      <div class="gU Up"><div role="button">Send</div></div>
+    </div>
+  </div>
   <h2 data-legacy-thread-id="18f2a9c1d0e3b4a5">Opened thread</h2>
 </div>
+<script>
+  // Start in the Sent view so the harness records per-view row stats (sampled 2.5 s after load).
+  history.replaceState(null, '', '#sent');
+  window.__ttWaitMs = 4000;
+</script>
 
 <!-- A popup compose that appears LATER (tests the MutationObserver path). Cloned via <template>: no HTML sink. -->
 <template id="popup-compose">
@@ -34,19 +48,42 @@
     <div class="gU Up"><div role="button">Send</div></div>
   </div>
 </template>
+<!-- Live-Gmail pattern (P2 round 7): addresses typed with commas, not committed as chips. -->
+<template id="popup-typed">
+  <div class="M9" id="popup-typed">
+    <input type="hidden" name="composeid" value="new-2">
+    <div name="to"><span data-hovercard-id="chip@example.test">chip</span><input type="text" peoplekit-id="x" value="typed1@example.test,typed2@example.test,"></div>
+    <div name="cc"><input type="text" peoplekit-id="y" value="Typed Cc <typedcc@example.test>;"></div>
+    <div name="bcc"><input type="text" peoplekit-id="z" value="typedbcc@example.test, half@typ"></div>
+    <input name="subjectbox" value="typed-recipients">
+    <div contenteditable="true"><p>Body</p></div>
+    <div class="gU Up"><div role="button">Send</div></div>
+  </div>
+</template>
 <!--SUT-->
 <script>
   setTimeout(() => {
     document.body.appendChild(document.getElementById('popup-compose').content.cloneNode(true));
+    document.body.appendChild(document.getElementById('popup-typed').content.cloneNode(true));
   }, 300);
   setTimeout(() => {
     for (const b of document.querySelectorAll('.tracklet-compose-btn')) if (b.textContent === 'P2: Read') b.click();
   }, 900);
+  // Repaint churn regression (P2 round 7): after the first paint, unchanged marks must not be rewritten.
+  window.__markMutations = 0;
+  setTimeout(() => {
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+        if (t && t.closest && t.closest('.tracklet-mark')) window.__markMutations++;
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
+  }, 1000);
   window.__ttProbe = () => {
     const report = window.__P2_REPORT ? JSON.parse(window.__P2_REPORT()) : null;
     const btns = [...document.querySelectorAll('.tracklet-compose-btn')].map((b) => ({ text: b.textContent, compose: b.closest('.M9')?.id }));
     const marks = [...document.querySelectorAll('.tracklet-mark')].map((m) => ({ id: m.dataset.trackletThreadId, text: m.textContent }));
-    return { report, buttons: btns, marks, panelPresent: Boolean(document.getElementById('tracklet-p2-panel')),
+    return { report, buttons: btns, marks, markMutationsAfterFirstPaint: window.__markMutations, panelPresent: Boolean(document.getElementById('tracklet-p2-panel')),
       panelLines: document.querySelectorAll('#tracklet-p2-panel .tracklet-p2-line').length };
   };
 </script>

@@ -6,20 +6,28 @@
 import type { GmailUiAdapter } from '../../extension/src/gmail/adapter';
 import { NativeDomAdapter } from '../../extension/src/gmail/native-adapter';
 import { DiagnosticPanel } from './panel';
+import { buildReport, coverage, gmailView, isOwnError, type Result, type ViewRowStats } from './report';
 
 declare const __ADAPTER__: 'native' | 'gmailjs';
+declare const __BUILD_ID__: string;
 
-type Result = { id: string; status: 'PASS' | 'FAIL' | 'RECORDED'; detail: unknown; at: string };
 const results: Result[] = [];
+const viewStats: ViewRowStats[] = [];
 const ttViolations: { sample: string; source: string; line: number }[] = [];
 const unexpectedHosts = new Map<string, number>();
-let adapter: GmailUiAdapter & { rowStats?: Record<string, number> };
+const startedAt = new Date().toISOString();
+let adapter: (GmailUiAdapter & { rowStats?: { rows: number; withId: number; totalMarks: number } }) | undefined;
 
-const redact = (s: string) => s.replace(/([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@/g, '$1***@');
-const report = () => redact(JSON.stringify({ harness: 'P2', adapter: adapter?.name, userAgent: navigator.userAgent, results, ttViolations, rowStats: adapter?.rowStats, unexpectedHosts: Object.fromEntries(unexpectedHosts) }, null, 2));
-const panel = new DiagnosticPanel(`P2 harness (${__ADAPTER__})`, report);
-const render = () => panel.render(results.map((r) => ({ status: r.status, id: r.id })),
-  `TT violations ${ttViolations.length} | rows ${JSON.stringify(adapter?.rowStats ?? {})} | unexpected hosts ${unexpectedHosts.size}`);
+const report = () => buildReport({
+  variant: __ADAPTER__, buildId: __BUILD_ID__, adapterName: adapter?.name, userAgent: navigator.userAgent, startedAt,
+  results, viewStats, ttViolations, unexpectedHosts: Object.fromEntries(unexpectedHosts),
+});
+const panel = new DiagnosticPanel(`P2 harness (${__ADAPTER__}) ${__BUILD_ID__}`, report);
+function render() {
+  const missing = coverage(results, viewStats).missing.length;
+  panel.render(results.map((r) => ({ status: r.status, id: r.id })),
+    `view ${gmailView(location.hash)} | missing checks ${missing} | TT ${ttViolations.length} | hosts ${unexpectedHosts.size} | rows ${JSON.stringify(adapter?.rowStats ?? {})}`);
+}
 function record(id: string, status: Result['status'], detail: unknown) {
   results.push({ id, status, detail, at: new Date().toISOString() });
   console.info(`[P2] ${id} ${status}`, detail);
@@ -34,6 +42,17 @@ document.addEventListener('securitypolicyviolation', (e) => {
   render();
 });
 
+// Uncaught errors originating from THIS harness bundle (P2.12). Gmail's own errors are ignored.
+const SELF_FILE = (document.currentScript as HTMLScriptElement | null)?.src?.split('/').pop();
+window.addEventListener('error', (e) => {
+  if (!isOwnError(e.filename, (e.error as Error | undefined)?.stack, SELF_FILE)) return;
+  record('P2.12 uncaught-error', 'FAIL', { message: String(e.message).slice(0, 200), line: e.lineno });
+});
+window.addEventListener('unhandledrejection', (e) => {
+  if (!isOwnError(undefined, (e.reason as Error | undefined)?.stack, SELF_FILE)) return;
+  record('P2.12 uncaught-error', 'FAIL', { message: String(e.reason).slice(0, 200) });
+});
+
 // Unexpected network hosts (P2.3)
 const ALLOWED = /(^|\.)(google\.com|gstatic\.com|googleusercontent\.com|googleapis\.com|ggpht\.com|youtube\.com|doubleclick\.net|google-analytics\.com|googletagmanager\.com)$/;
 try {
@@ -45,7 +64,18 @@ try {
   }).observe({ type: 'resource', buffered: true });
 } catch (e) { record('P2.3 network-observer', 'FAIL', String(e)); }
 
-async function createAdapter(): Promise<typeof adapter> {
+// Per-view row statistics (P2.8): sampled 2.5 s after every view change, and every 10 s.
+function sampleRows() {
+  const s = adapter?.rowStats;
+  if (!s) return;
+  const view = gmailView(location.hash);
+  const last = viewStats.filter((v) => v.view === view).pop();
+  if (last && last.rows === s.rows && last.withId === s.withId && last.totalMarks === s.totalMarks) return;
+  viewStats.push({ view, rows: s.rows, withId: s.withId, totalMarks: s.totalMarks, at: new Date().toISOString() });
+  render();
+}
+
+async function createAdapter(): Promise<NonNullable<typeof adapter>> {
   if (__ADAPTER__ === 'gmailjs') {
     const { GmailJsAdapter } = await import('./gmailjs-adapter');
     return new GmailJsAdapter();
@@ -58,11 +88,14 @@ createAdapter()
   .then(async (a) => {
     adapter = a;
     await a.ready();
-    record('P2.9 load', 'PASS', { adapter: a.name, msToLoad: Math.round(performance.now() - t0) });
+    record('P2.9 load', 'PASS', { variant: __ADAPTER__, adapter: a.name, buildId: __BUILD_ID__, msToLoad: Math.round(performance.now() - t0) });
     a.setThreadMarks(new Map());
-    a.onThreadViewed((id) => record('P2.11 view_thread', 'RECORDED', { threadId: id }));
+    window.addEventListener('hashchange', () => { setTimeout(sampleRows, 2500); render(); });
+    setTimeout(sampleRows, 2500);
+    setInterval(sampleRows, 10_000);
+    a.onThreadViewed((id) => record('P2.11 view_thread', 'RECORDED', { threadId: id, view: gmailView(location.hash) }));
     a.onCompose((c) => {
-      record('P2.5 compose-detected', 'PASS', { kind: c.kind, composeIdPresent: Boolean(c.composeId) });
+      record('P2.5 compose-detected', 'PASS', { kind: c.kind, composeIdPresent: Boolean(c.composeId), view: gmailView(location.hash) });
       try {
         c.addButton('P2: Read', () => {
           try {
@@ -71,7 +104,7 @@ createAdapter()
               subject: s.subject, htmlLength: s.html.length, htmlHasSignatureDiv: /gmail_signature/.test(s.html), hasAttachments: s.hasAttachments });
           } catch (e) { record('P2.6 read-fields', 'FAIL', String(e)); }
         });
-        c.addButton('P2: Close', () => { c.close(); record('P2.7 close', 'RECORDED', { note: 'Esc-close issued; check Drafts' }); });
+        c.addButton('P2: Close', () => { c.close(); record('P2.7 close', 'RECORDED', { kind: c.kind, note: 'Esc-close issued; check Drafts' }); });
         record('P2.5 button-injected', 'PASS', { kind: c.kind });
       } catch (e) { record('P2.5 button-injected', 'FAIL', String(e)); }
     });

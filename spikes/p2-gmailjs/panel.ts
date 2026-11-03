@@ -20,7 +20,16 @@ export class DiagnosticPanel {
     copy.type = 'button';
     copy.textContent = 'Copy results';
     copy.style.marginLeft = '8px';
-    copy.addEventListener('click', () => { void navigator.clipboard?.writeText(this.onCopy()); copy.textContent = 'Copied'; });
+    copy.addEventListener('click', () => {
+      const text = this.onCopy();
+      console.info('[P2] REPORT\n' + text);   // always available in DevTools even if the clipboard is blocked
+      const fail = () => { copy.textContent = 'Copy blocked: in DevTools run copy(__P2_REPORT())'; };
+      try {
+        const p = navigator.clipboard?.writeText(text);
+        if (!p) { fail(); return; }
+        p.then(() => { copy.textContent = 'Copied ✓'; }, fail);
+      } catch { fail(); }
+    });
     const rows = lines.slice(-10).map((l) => {
       const d = this.doc.createElement('div');
       d.className = 'tracklet-p2-line';
