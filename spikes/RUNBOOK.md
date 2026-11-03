@@ -38,8 +38,12 @@ All spikes are throwaway and local. Nothing here deploys anything. Record outcom
 
 ## P2 runtime — gmail.js harness (no Google Cloud project, no OAuth, sends nothing)
 The harness has **no permissions**, makes **no network requests**, and its buttons only *read* the composer or *close* it (Esc). It never sends.
-1. Build: `node spikes/p2-gmailjs/build.mjs` → `spikes/p2-gmailjs/dist`.
-2. In the dedicated test profile: chrome://extensions → **Load unpacked** → `spikes/p2-gmailjs/dist`.
+1. Build both variants:
+   - `node spikes/p2-gmailjs/build.mjs native` → `spikes/p2-gmailjs/dist-native` (**run this first**)
+   - `node spikes/p2-gmailjs/build.mjs gmailjs` → `spikes/p2-gmailjs/dist-gmailjs`
+   
+   Remove any older "Tracklet P2 spike" from chrome://extensions first (the round-2 `dist/` build is the one that failed).
+2. In the dedicated test profile, **Load unpacked** one variant at a time and run steps 3–13 for each. The panel title shows `(native)` or `(gmailjs)`. Expectation: `P2.10 trusted-types-60s` = PASS with 0 violations; if not, copy the `ttViolations` entries.
 3. Open https://mail.google.com (account A) and open DevTools (F12) → Console and Network tabs. A small "P2 gmail.js harness" panel appears bottom-left.
 4. **P2.9 load / P2.10 Trusted Types:** within about 10 s the panel shows `PASS P2.9 load`. Note any `P2.10 trusted-types` line, and any red console errors mentioning `TrustedHTML` or `gmail.js`.
 5. **P2.5 compose detection + button:** click Compose. Expect `PASS P2.5 compose-detected` and two buttons, **"P2: Read"** and **"P2: Close"**, next to Send.

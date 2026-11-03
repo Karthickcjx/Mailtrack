@@ -63,6 +63,61 @@ Documentation point for the design (Q14): Chrome caches and renews access tokens
 | Spike typecheck (`tsc -p spikes/tsconfig.json`) | PASS | Added to `npm run typecheck` |
 | Live P2.3, P2.5–P2.11 | **BLOCKED (manual)** | RUNBOOK §P2 |
 
+### P2 round 3 (2026-11-03): Trusted Types failure investigation
+**Reported by you (live Gmail):** `This document requires 'TrustedHTML' assignment. The action has been blocked.` at `page.js:689`.
+
+**Root cause (confirmed by local reproduction):**
+- `page.js:689` is **not gmail.js code**. It is the bundled **jQuery 3.7.1** selector engine (Sizzle `setDocument()` → `assert()` feature probe: `el.innerHTML = "<a id='…' href='' disabled='disabled'></a><select …>"`). That probe is inside `try/catch`, so it only produces the console violation you saw.
+- The fatal failure comes two probes later: jQuery 3.7.1 `support` feature detection at bundle line 2709 (`div.innerHTML = "<textarea>x</textarea>"`) is **not** inside `try/catch`. Under Trusted Types enforcement it throws an **uncaught TypeError while jQuery initialises**. The whole bundle aborts, so gmail.js and the harness never run.
+- So the triggering library operation is **jQuery 3.7.1's module-initialisation feature tests**, which gmail.js depends on (gmail.js's constructor requires jQuery).
+- Also found: my round-2 harness's P2.10 probe tried `trustedTypes.createPolicy('default', s => s)`, which is a **permissive policy and is forbidden**. It has been **removed**. The harness now only *observes* `securitypolicyviolation` events.
+
+**Reproduction method:** `spikes/p2-gmailjs/tt/run-tt.mjs` serves a fixture page with a strict CSP (`require-trusted-types-for 'script'; trusted-types 'none'`: no policy may be created at all) and loads the script under test in local headless Chrome. This is stricter than or equal to Gmail's enforcement.
+
+| Bundle under strict TT | Violations | Uncaught errors | Outcome |
+|---|---|---|---|
+| jQuery 3.7.1 alone | line 689 (caught), line 2709 | `Failed to set the 'innerHTML' property … requires 'TrustedHTML'` | **FAIL**: jQuery never initialises |
+| gmail.js 1.1.16 + jQuery 3.7.1 | same | same | **FAIL**: identical root cause |
+| Previous harness `page.js` | same | same | **FAIL**: matches your report |
+| jQuery **4.0.0** alone | none | none | Initialises. `$('<span>')` and `.html('<b>')` are **still blocked** (correct, secure behaviour); `.text()` works |
+| gmail.js 1.1.16 + jQuery **4.0.0** | none | none | Constructs. No jQuery APIs removed in 4.0 are used by gmail.js (its four `.bind` calls are gmail.js's own API) |
+
+**Can gmail.js work under Gmail's TT without weakening security?** Partially:
+- Its **data/observer paths** (hidden-input `.val()`, `.html()` *getter*, observers) don't need HTML sinks, and they load cleanly with jQuery 4.0.0.
+- Its **UI helpers pass markup strings to jQuery `.html()`** and cannot work without a TT policy, which we won't create:
+  - `add_compose_button` (`button.html(content_html)`)
+  - `add_toolbar_button`, `add_modal_window`, `infobox`
+  - body/name setters
+  - `to_wrapper` (`$("<span />")…`)
+  
+  → They must never be used. Our adapters inject UI with DOM APIs only.
+- gmail.js + jQuery 4 is an **untested combination upstream** (gmail.js targets jQuery 3), and gmail.js is unmaintained since 2025-01.
+
+**Native DOM fallback, built and tested:**
+| Test (strict TT, headless Chrome, synthetic Gmail-like fixture) | Result |
+|---|---|
+| Static: `extension/src/gmail/native-adapter.ts` (+ `adapter.ts`, `map.ts`), `panel.ts`, `harness.ts`, `gmailjs-adapter.ts` contain no `innerHTML/outerHTML =`, `insertAdjacentHTML`, `document.write`, `createPolicy` or `.html(` | **PASS** (4 tests) |
+| Native bundle: HTML-sink/`createPolicy` occurrences | **0** (13 KB, no jQuery) |
+| Native adapter under strict TT: violations / uncaught errors | **0 / 0 → PASS** |
+| Diagnostic panel injected via `createElement`/`textContent` | **PASS** (panel present with lines) |
+| Compose detection: initial inline reply and a popup compose added later (MutationObserver) | **PASS**: kinds `reply`, `new` |
+| Buttons injected next to Send (text only) | **PASS**: 2 per compose |
+| Field read (popup): To/Cc/Bcc de-duplicated and lower-cased, Unicode subject, signature detected, attachment detected | **PASS** |
+| Thread-row marks (legacy ID and `thread-f:` ID; row without an ID skipped) | **PASS**: 2 marks |
+| Thread-view event from `h2[data-legacy-thread-id]` | **PASS** (recorded) |
+| gmail.js + jQuery 4 harness bundle under strict TT | **PASS**: 0 violations, 0 errors at load (gmail.js `on_load` can't complete outside real Gmail) |
+| **Negative control**: planting `innerHTML` in the panel | Static test **and** both headless runs **FAIL** as intended; restored afterwards |
+
+**Limits of this evidence:** the fixture is **synthetic**. Its structure mirrors the selectors gmail.js 1.1.16 uses, but it is not real Gmail markup. Gmail's actual CSP (exact `trusted-types` allowlist) wasn't read; our fixture forbids all policies, which is at least as strict. **Live Gmail confirmation is still required** (RUNBOOK §P2, now with two variants).
+
+**Decision (2026-11-03): APPROVED by you with conditions.** Native DOM adapter primary (moved to `extension/src/gmail/native-adapter.ts`, with `map.ts` and its tests); gmail.js + jQuery 4.0.0 secondary, experimental and isolated in `spikes/`; no permissive TT policies, no disabling TT, no `innerHTML` string assignment; `GmailUiAdapter` and the compose fallback retained; TT regression tests retained. Added isolation tests (the extension never imports gmail-js/jquery), negatively verified with a planted import. Full check after the move: 34/34 tests, typecheck, build, secret scan 0 findings. **Live Gmail compatibility: NOT YET CONFIRMED.** Awaiting your results.
+
+Original recommendation:
+1. Make the **native DOM adapter the primary** `GmailUiAdapter`. It is TT-safe by construction, 13 KB, has no jQuery/gmail.js dependency, and uses the same selectors gmail.js relies on, kept in one `SELECTORS` table.
+2. Keep **gmail.js + jQuery 4.0.0** only as a secondary *data-reading* candidate, live-tested side by side. Adopt it only if the native adapter shows a gap that gmail.js's parsing fills (none needed for the MVP's compose-read, row-mark and thread-view functions).
+3. Never use gmail.js UI helpers, never create Trusted Types policies, never use HTML sinks. This is enforced by the static tests in `tt/tt.test.ts`.
+4. The extension-hosted compose page remains the fallback if live Gmail breaks the selectors.
+
 ## P3 — MIME and threading
 | Test | Result | Notes |
 |---|---|---|
@@ -116,7 +171,7 @@ Documentation point for the design (Q14): Chrome caches and renews access tokens
 |---|---|
 | Phase 0 | PASS (manual unpacked-load confirmation pending) |
 | P1 | BLOCKED: OAuth client |
-| P2 | InboxSDK FAIL (rejected). gmail.js static PASS, harness built and offline-tested; live BLOCKED (manual) |
+| P2 | InboxSDK FAIL (rejected). **gmail.js + jQuery 3.7.1 FAIL under Trusted Types** (root cause: jQuery 3 load-time `innerHTML` feature tests). Native DOM adapter PASS under strict TT (synthetic fixture); gmail.js + jQuery 4 loads cleanly. Live Gmail BLOCKED (manual, both variants) |
 | P3 | Offline PASS; live BLOCKED (P1) |
 | P4 | Harness PASS; tests BLOCKED (manual Gmail) |
 | P5 | Harness ready; BLOCKED (manual Gmail) |

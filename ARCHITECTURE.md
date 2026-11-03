@@ -2,7 +2,14 @@
 
 Status: **REVISED DRAFT (rev 3), awaiting approval.** No code, packages, accounts, OAuth settings or deployments exist.
 
-> **Rev 6 (2026-11-03): D12 confirmed by you.** InboxSDK rejected; **gmail.js primary**, subject to live P2; the integration sits behind `extension/src/gmail/adapter.ts` (`GmailUiAdapter`); the extension-hosted compose page is the retained fallback. See §6.1.
+> **Rev 7 (2026-11-03): D12 changed (approved by you), based on P2 round 3 evidence.**
+> - **Primary Gmail integration: native DOM adapter** (`extension/src/gmail/native-adapter.ts`, implementing `GmailUiAdapter`). Root cause of the live failure: jQuery 3.7.1, required by gmail.js, assigns HTML strings to `innerHTML` in uncaught load-time feature tests, which Gmail's Trusted Types enforcement blocks (spikes/RESULTS.md P2 round 3).
+> - **gmail.js 1.1.16 + jQuery 4.0.0: secondary, experimental, isolated** under `spikes/p2-gmailjs/`. Data reads only; its UI helpers (which pass markup to `.html()`) are never used. Tests enforce that `extension/`, `shared/` and `backend/` never import gmail-js or jquery.
+> - **Hard rules (tested):** no permissive or any Trusted Types policies, no disabling TT, no HTML-string assignment (`innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`/jQuery `.html(str)`). Reading `innerHTML` (getter) is allowed. Regression tests: `spikes/p2-gmailjs/tt/tt.test.ts` (strict-TT headless Chrome plus static scans).
+> - `GmailUiAdapter` and the extension-owned compose page (fallback) are retained unchanged.
+> - **Live Gmail compatibility is not yet confirmed.** It awaits your manual results.
+>
+> **Rev 6 (2026-11-03): D12 confirmed by you.** *(superseded by rev 7)* InboxSDK rejected; **gmail.js primary**, subject to live P2; the integration sits behind `extension/src/gmail/adapter.ts` (`GmailUiAdapter`); the extension-hosted compose page is the retained fallback. See §6.1.
 >
 > **Rev 5 (2026-11-03): evidence from Phase P (spikes/RESULTS.md).**
 > - **D12 updated (proposed, needs your confirmation):** InboxSDK is **rejected**. Its terms and privacy pages are unavailable (404), App ID registration is mandatory, and the shipped code sends error and event telemetry (including a SHA-256 hash of the user's email) to `api.inboxsdk.com` by default. **gmail.js (MIT, no vendor calls)** becomes the primary candidate, pending runtime spike P2.5–P2.9. Its last release is from 2025-01, so the extension-hosted compose page is promoted to a planned fallback, not just a last resort.
@@ -286,7 +293,8 @@ The rev 1 device-cookie layer is removed: proxies don't forward cookies, and thi
 
 None of the options adds paid dependencies.
 
-### 6.1 gmail.js maintenance risk and fallback design (rev 6)
+### 6.1 gmail.js maintenance risk and fallback design (rev 6; superseded in part by rev 7)
+> Rev 7: the native DOM adapter is now primary. The table below still describes the risks of the isolated gmail.js candidate. The Trusted Types row is resolved: jQuery 3.7.1 fails, jQuery 4.0.0 loads, and gmail.js UI helpers are banned. Option (a) "default TT policy" is **rejected** and must not be used.
 
 **Risks (evidence from P2 static review):**
 | Risk | Evidence | Mitigation |
