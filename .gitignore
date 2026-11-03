@@ -26,3 +26,8 @@ spikes/**/*.log
 Thumbs.db
 .vscode/
 .idea/
+
+# P2 Trusted Types runner artefacts
+spikes/p2-gmailjs/tt/.out/
+spikes/p2-gmailjs/tt/.chrome-profile/
+spikes/p2-gmailjs/dist-*/

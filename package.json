@@ -22,7 +22,7 @@
     "@types/chrome": "^0.3.7",
     "@types/node": "^26.6.6",
     "gmail-js": "1.1.16",
-    "jquery": "3.7.1",
+    "jquery": "4.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.1.0"

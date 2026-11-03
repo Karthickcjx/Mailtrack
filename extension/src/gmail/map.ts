@@ -1,5 +1,5 @@
 // Pure mapping helpers for the gmail.js adapter (unit-testable, no DOM).
-import type { ComposeKind, MailAddress } from '../../extension/src/gmail/adapter';
+import type { ComposeKind, MailAddress } from './adapter';
 
 export function toComposeKind(gmailJsType: unknown): ComposeKind {
   switch (gmailJsType) {

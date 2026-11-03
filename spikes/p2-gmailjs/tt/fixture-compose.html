@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Synthetic Gmail-like fixture (TT strict)</title>
+<!--REPORTER-->
+</head><body>
+<!-- SYNTHETIC fixture: structure mirrors the selectors gmail.js 1.1.16 uses; it is NOT real Gmail markup. -->
+<div role="main">
+  <table><tbody>
+    <tr class="zA"><td class="xY"><span data-legacy-thread-id="18f2a9c1d0e3b4a5">Row 1</span></td></tr>
+    <tr class="zA"><td class="xY"><span data-thread-id="#thread-f:1793691002000123456">Row 2</span></td></tr>
+    <tr class="zA"><td class="xY"><span>Row without id</span></td></tr>
+  </tbody></table>
+  <div class="AO">
+    <div class="M9" id="inline-reply">
+      <input type="hidden" name="composeid" value="reply-1">
+      <input type="hidden" name="subject" value="Re: Quarterly numbers">
+      <div name="to"><span data-hovercard-id="peer@example.test">peer</span></div>
+      <div contenteditable="true">Thanks!</div>
+      <div class="gU Up"><div role="button">Send</div></div>
+    </div>
+  </div>
+  <h2 data-legacy-thread-id="18f2a9c1d0e3b4a5">Opened thread</h2>
+</div>
+
+<!-- A popup compose that appears LATER (tests the MutationObserver path). Cloned via <template>: no HTML sink. -->
+<template id="popup-compose">
+  <div class="M9" id="popup">
+    <input type="hidden" name="composeid" value="new-1">
+    <div name="to"><span data-hovercard-id="A@Example.test">A</span><span data-hovercard-id="b@example.test">B</span></div>
+    <div name="cc"><span data-hovercard-id="a@example.test">dup</span><span data-hovercard-id="c@example.test">C</span></div>
+    <div name="bcc"><span data-hovercard-id="d@example.test">D</span></div>
+    <input name="subjectbox" value="P2 Résumé ✓ 測試">
+    <div contenteditable="true"><p>Hello <a href="https://example.com/x?y=1#z">link</a></p><div class="gmail_signature">Sig</div></div>
+    <div class="dL">file.pdf</div>
+    <div class="gU Up"><div role="button">Send</div></div>
+  </div>
+</template>
+<!--SUT-->
+<script>
+  setTimeout(() => {
+    document.body.appendChild(document.getElementById('popup-compose').content.cloneNode(true));
+  }, 300);
+  setTimeout(() => {
+    for (const b of document.querySelectorAll('.tracklet-compose-btn')) if (b.textContent === 'P2: Read') b.click();
+  }, 900);
+  window.__ttProbe = () => {
+    const report = window.__P2_REPORT ? JSON.parse(window.__P2_REPORT()) : null;
+    const btns = [...document.querySelectorAll('.tracklet-compose-btn')].map((b) => ({ text: b.textContent, compose: b.closest('.M9')?.id }));
+    const marks = [...document.querySelectorAll('.tracklet-mark')].map((m) => ({ id: m.dataset.threadId, text: m.textContent }));
+    return { report, buttons: btns, marks, panelPresent: Boolean(document.getElementById('tracklet-p2-panel')),
+      panelLines: document.querySelectorAll('#tracklet-p2-panel .tracklet-p2-line').length };
+  };
+</script>
+</body></html>
