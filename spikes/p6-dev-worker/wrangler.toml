@@ -1,0 +1,26 @@
+# SPIKE P6.3–P6.6 — TEMPORARY DEV WORKER. NOT production. Synthetic data only.
+# Deploy ONLY after the owner confirms the Cloudflare account is ready (see README.md).
+name = "t-dev-spike"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true          # needed to test the workers.dev URL + certificate (P6.6)
+preview_urls = false
+
+[vars]
+EXPIRES_AT = "2026-11-17T00:00:00Z"   # hard kill switch: all routes return 410 afterwards
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tracklet-dev-spike"
+# Replace with the id printed by `wrangler d1 create tracklet-dev-spike` (README step 3).
+database_id = "00000000-0000-0000-0000-000000000063"
+migrations_dir = "migrations"
+
+# P6.3: Rate Limiting binding (availability on the Free plan is the thing being tested).
+# Docs: https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/  (period must be 10 or 60)
+[[ratelimits]]
+name = "RL"
+namespace_id = "1063"
+  [ratelimits.simple]
+  limit = 5
+  period = 10
