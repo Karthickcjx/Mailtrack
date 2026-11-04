@@ -44,7 +44,7 @@ Use the account you'll track from, in **Google Chrome**.
 1. Chrome → profile menu → Add → name "Tracklet test" → sign in with the tracking Gmail account.
 2. `chrome://extensions` → Developer mode ON. Remove "Tracklet (personal, dev)" and any "Tracklet P1/P3 spike" if present.
 
-**B. Google Cloud** (full detail in `SETUP_GOOGLE_CLOUD.md` §A–E-1; do **not** do §E-2)
+**B. Google Cloud** (full detail in `docs/setup/SETUP_GOOGLE_CLOUD.md` §A–E-1; do **not** do §E-2)
 1. console.cloud.google.com → New Project `tracklet-personal` (no organization).
 2. APIs & Services → Library → **Gmail API** → Enable. Note the per-user quota shown on its Quotas page.
 3. OAuth consent / Google Auth Platform:

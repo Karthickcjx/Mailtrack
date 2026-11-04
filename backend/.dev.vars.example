@@ -1,0 +1,10 @@
+# Copy to backend/.dev.vars (gitignored) for `wrangler dev`. Never commit real values.
+# Generate random values, e.g.: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+SESSION_SIGNING_KEY=replace-with-at-least-32-random-characters
+IP_HASH_SALT=replace-with-at-least-16-random-characters
+# Comma-separated Google account IDs allowed to use this backend: the `sub` field of Google tokeninfo
+# for your access token (a string such as 109876543210987654321 — not your email). Empty or unset = nobody.
+# Get yours: start the backend, click "Sign in with Google" in the Tracklet popup; on "not allowed",
+# click "Show my Google account ID". (Do not use chrome.identity.getProfileUserInfo().id: Chrome does not
+# document it as equal to `sub`.) Personal identifier: keep out of git.
+ALLOWED_GOOGLE_SUBS=

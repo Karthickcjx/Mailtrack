@@ -1,6 +1,6 @@
 // SPIKE P1 + P3 (throwaway). Every action is triggered by an explicit button click.
 // Tokens are never displayed or logged in full: only length + tokeninfo fields.
-import { buildMime, insertPixelAtTop, toRaw } from '../p3-mime/mime';
+import { BatchSender, dryRun, type BatchInput } from '../p3-mime/send';
 
 const out = document.getElementById('out') as HTMLPreElement;
 const log = (label: string, data: unknown) => {
@@ -53,38 +53,46 @@ const handlers: Record<string, () => Promise<void>> = {
     await chrome.identity.removeCachedAuthToken({ token: t });
     log('P1.7 revoke', { http: r.status });
   },
-  // P3.2 — 3 single-recipient copies to YOUR test addresses (typed manually). No tracking server involved.
+  // P3 dry run — validates and builds every copy and shows the decoded MIME. NEVER calls the send endpoint.
+  async p3dry() {
+    const from = (await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' as chrome.identity.AccountStatus })).email || 'me@example.invalid';
+    const d = dryRun(p3Input(from), newMessageId);
+    log('P3 DRY RUN (nothing sent)', d);
+  },
+  // P3.2 — single-recipient copies to YOUR test addresses (typed manually), via the safe BatchSender.
   async p3send() {
-    const raw = (document.getElementById('rcpts') as HTMLInputElement).value.split(',').map((s) => s.trim()).filter(Boolean);
-    if (raw.length < 1 || raw.length > 3) throw new Error('enter 1-3 of YOUR OWN test addresses');
-    if (!confirm(`Send ${raw.length} test copies to:\n${raw.join('\n')}\n\nOnly use your own test accounts.`)) return;
-    const t = await getToken(false);
-    const info = await tokeninfo(t);
-    const firstId = `<${crypto.randomUUID()}@tracklet.invalid>`;
-    let threadId: string | undefined;
-    const results: unknown[] = [];
-    for (const [i, to] of raw.entries()) {
-      const html = insertPixelAtTop('<p>P3 spike copy ' + (i + 1) + ' — <a href="https://example.com/?q=1#frag">example link</a></p>', 'https://example.com/p3-no-tracking.gif');
-      const mime = buildMime({
-        from: { email: info.email! }, to: { email: to }, subject: 'P3 spike Résumé ✓ 測試',
-        html, text: `P3 spike copy ${i + 1} — example link https://example.com/?q=1#frag`,
-        messageId: i === 0 ? firstId : `<${crypto.randomUUID()}@tracklet.invalid>`,
-        ...(i > 0 ? { inReplyTo: firstId } : {}),
-      });
-      const body: Record<string, string> = { raw: toRaw(mime) };
-      if (threadId) body.threadId = threadId;
-      const t0 = performance.now();
-      const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST', headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' }, body: JSON.stringify(body),
-      });
-      const j = (await r.json()) as { id?: string; threadId?: string; error?: unknown };
-      if (i === 0 && j.threadId) threadId = j.threadId;
-      results.push({ copy: i + 1, http: r.status, ms: Math.round(performance.now() - t0), id: j.id, threadId: j.threadId, error: j.error });
-      await new Promise((res) => setTimeout(res, 1000));
-    }
-    log('P3.2 send results', { firstMessageId: firstId, results });
+    const btn = document.getElementById('p3send') as HTMLButtonElement;
+    if (sender.busy || btn.disabled) { log('P3 send ignored', { reason: 'a batch is already being sent' }); return; }
+    const recipients = readRecipients();
+    if (!confirm(`Send ${recipients.length} REAL test email(s) to:\n${recipients.join('\n')}\n\nOnly use your own test accounts.`)) return;
+    btn.disabled = true;
+    try {
+      const info = await tokeninfo(await getToken(false));
+      const result = await sender.send(p3Input(info.email ?? ''));
+      log('P3.2 send results', result);
+    } finally { btn.disabled = false; }
   },
 };
+
+// --- P3 wiring (no tokens are ever logged; BatchSender scrubs token values from errors) ---
+const newMessageId = () => `<${crypto.randomUUID()}@tracklet.invalid>`;
+const readRecipients = () => (document.getElementById('rcpts') as HTMLInputElement).value.split(',').map((s) => s.trim()).filter(Boolean);
+const p3Input = (fromEmail: string): BatchInput => ({
+  from: { email: fromEmail },
+  recipients: readRecipients(),
+  subject: 'P3 spike Résumé ✓ 測試',
+  html: (i) => `<p>P3 spike copy ${i + 1} — <a href="https://example.com/?q=1#frag">example link</a></p>`,
+  text: (i) => `P3 spike copy ${i + 1} — example link https://example.com/?q=1#frag`,
+  pixelUrl: 'https://example.com/p3-no-tracking.gif',
+  spacingMs: 1000,
+});
+const sender = new BatchSender({
+  fetch: (url, init) => fetch(url, init),
+  getToken: (interactive) => getToken(interactive),
+  invalidateToken: (token) => chrome.identity.removeCachedAuthToken({ token }),
+  sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+  newMessageId,
+});
 
 for (const [id, fn] of Object.entries(handlers)) {
   document.getElementById(id)?.addEventListener('click', () => fn().catch((e) => log(`${id} ERROR`, String(e))));

@@ -4,7 +4,7 @@
 | # | Decision | Conditions |
 |---|---|---|
 | **Q14** | **APPROVED:** `chrome.identity.getAuthToken()` with a Google OAuth **Chrome Extension** client (D2-rev applied). `launchWebAuthFlow` is not the primary method. | Stable extension ID; scopes limited to `openid`, `userinfo.email`, `gmail.send`; no client secrets; interactive authorization only after a clear user action; test account selection, caching, expiry, revocation and re-consent; document that automatic access-token renewal does **not** remove the need for consent (Testing-mode 7-day expiry, revocation and password change still force re-consent). Initial tests use a **dedicated Chrome profile** for the tracking Gmail account. |
-| **Q15** | **APPROVED:** a locally generated extension key | The private PEM stays outside Git (stored outside the repo, plus `.gitignore` rules); never published or shared; the procedure for preserving the ID is documented in `docs/EXTENSION_ID.md`. |
+| **Q15** | **APPROVED:** a locally generated extension key | The private PEM stays outside Git (stored outside the repo, plus `.gitignore` rules); never published or shared; the procedure for preserving the ID is documented in `docs/setup/EXTENSION_ID.md`. |
 | **Q16** | **NOT APPROVED** for registration | Inspect the licence, terms, privacy implications, external network calls and MV3 compatibility, and compare with gmail.js. Do not register or send data to the vendor. |
 | **Q17** | **APPROVED** temporarily | Official Cloudflare download only; quick tunnel only while P4/P5 run; no permanent tunnel. |
 | Phases | **APPROVED:** Phase P (P1–P6) and Phase 0 | No full product, no production tracking, no sends to real recipients, no production deploy, no purchases. |
@@ -20,8 +20,8 @@
 | Q6 | Attachments | Blocked in MVP | D8 |
 | Q7 | Disclosure | Optional, off by default | D9 |
 | Q8 | Subjects on backend | Not stored by default | D10 |
-| **Q9** | Who creates the Google Cloud project and OAuth client | **You**, using `SETUP_GOOGLE_CLOUD.md` | — |
-| **Q10** | Cloudflare account | **You** create it, with a **neutral** workers.dev subdomain, using `SETUP_CLOUDFLARE.md` | D3 |
+| **Q9** | Who creates the Google Cloud project and OAuth client | **You**, using `docs/setup/SETUP_GOOGLE_CLOUD.md` | — |
+| **Q10** | Cloudflare account | **You** create it, with a **neutral** workers.dev subdomain, using `docs/setup/SETUP_CLOUDFLARE.md` | D3 |
 | **Q11** | Test inboxes | **Second Gmail account** first; Outlook/iCloud later if available | PROTOTYPE_TEST_PLAN |
 | **Q12** | Recipient addresses | **Never stored readable on the backend by default.** Local to the extension; the backend gets only an HMAC `recipient_key` | D11 (confirmed) |
 | **Q13** | Browsers | **Chrome only** for the MVP | — |

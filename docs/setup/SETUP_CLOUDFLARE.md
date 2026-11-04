@@ -1,6 +1,6 @@
 # CHECKLIST — Cloudflare account and workers.dev subdomain (performed by you)
 
-Claude does **not** perform these steps. Facts are cited from `VERIFIED_PLATFORM_FACTS.md` §5.
+Claude does **not** perform these steps. Facts are cited from `docs/design/VERIFIED_PLATFORM_FACTS.md` §5.
 
 ## A. Create the account
 1. Go to https://dash.cloudflare.com/sign-up.

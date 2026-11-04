@@ -1,6 +1,6 @@
 # P6 temporary dev Worker (P6.3–P6.6)
 
-**Status: prepared, NOT deployed.** Deploy only after you confirm that the Cloudflare account is ready (SETUP_CLOUDFLARE.md).
+**Status: prepared, NOT deployed.** Deploy only after you confirm that the Cloudflare account is ready (docs/setup/SETUP_CLOUDFLARE.md).
 This is a dev spike, not production. It uses synthetic data only (`syn-*` tokens; anything else returns 404).
 
 | Safety control | How |

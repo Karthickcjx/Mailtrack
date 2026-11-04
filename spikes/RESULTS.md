@@ -289,7 +289,7 @@ Plan: `spikes/P1-P3-PLAN.md`. **No live OAuth, no Google Cloud project yet, no e
 | P1 spike build (dummy client ID) | PASS | manifest scopes = 3 approved; permissions `identity`, `identity.email`; hosts `oauth2.googleapis.com`, `gmail.googleapis.com`; `key` = stable key (ID `hhejoehmmjbjahinnpgnfhfakbkhilcd`); bundle hosts only example.com (synthetic pixel), gmail.googleapis.com, oauth2.googleapis.com; no secrets; `dist` removed afterwards |
 | P3 MIME builder | PASS 9/9 | unchanged tests |
 | **Browser Buffer shim (used by the live P3 send)** | **FAIL → FIXED** | `buffer-shim.js` base64-encoded with `String.fromCharCode(...bytes)` → `RangeError: Maximum call stack size exceeded` on a 250 KB message (small and Unicode inputs matched Node). Fix: chunked encoding (0x8000 per call). Regression: `buffer-shim.test.ts` (6 tests incl. 250 KB string, a chunk-boundary case and a >300 KB full MIME message vs Node `toRaw`); negative control with the old encoder → 2 failures |
-| Live P1.1–P1.8, P3.1–P3.5 | **BLOCKED** | Need your Google Cloud project + Chrome Extension OAuth client (`SETUP_GOOGLE_CLOUD.md`), Google Chrome (not Edge), and your approval; P3 sends real emails to your own test account |
+| Live P1.1–P1.8, P3.1–P3.5 | **BLOCKED** | Need your Google Cloud project + Chrome Extension OAuth client (`docs/setup/SETUP_GOOGLE_CLOUD.md`), Google Chrome (not Edge), and your approval; P3 sends real emails to your own test account |
 | P3.6, P3.7, P3.8 | Not supported by the harness | Proposed: drop P3.6/P3.8 (not applicable to the MVP), reduce P3.7 to 3 timed copies (see plan §4) |
 
 ## P1 live OAuth — run 1 setup (2026-11-03)
@@ -333,6 +333,59 @@ Google Cloud: project `tracklet-personal`; Gmail API enabled (6,000 units/min/us
 **Negative control:** restoring the old `popup.ts`/`popup.html` from HEAD → 2 tests fail; fix restored → 16/16.
 
 **Full check:** typecheck, 84/84 tests, build, secret scan 0. Spike rebuilt with the real Client ID (scopes = 3 approved; permissions `identity`, `identity.email`); the only `getAccounts` text left in the bundle is the explanatory comment.
+
+### P1 live results (2026-11-03): consolidated status
+**Evidence type:** results **supplied by you in chat**.
+- **PASS** = evidence values were supplied in the session and are quoted here.
+- **PASS (reported)** = you stated it passed (on 2026-11-04 for P1.1–P1.3 and P1.5, referring to popup logs), but **the log contents never reached Claude's session**, so they are not quoted or reconstructed.
+
+No raw popup log or screenshot is stored in the repo. Paste the logs to upgrade any "reported" row.
+
+| Test | Status | Evidence |
+|---|---|---|
+| P1.1 loaded ID = OAuth Item ID; `ready` log | **PASS (reported)** | You reported the `ready` log showed the correct extension ID. Log text not present in the session. Independently true offline: the built manifest key maps to `hhejoehmmjbjahinnpgnfhfakbkhilcd` |
+| P1.2 interactive consent only after a click; unverified-app screen; scopes listed | **PASS (reported)** | You reported PASS based on your popup log; log text not present in the session. Corroborated in part by P1.7 (interactive token HTTP 200 after a user click) |
+| P1.3 silent token ×5 | **PASS (reported)** | You reported PASS based on your popup log; log text not present in the session |
+| P1.4 dev-channel `getAccounts` (old harness) | **FAIL → FIXED** | Live: `TypeError: chrome.identity.getAccounts is not a function` (reported). Fixed in `99fb6b7` |
+| P1.4 "Profile info" (`getProfileUserInfo`) | **PASS (reported)** | You reported it returned the profile's email and ID (values not recorded) |
+| **P1.4a** primary account via `getProfileUserInfo().id` → `getAuthToken({account:{id}})` | **PASS (reported)** | You reported PASS. Expected log fields (`source: "getProfileUserInfo().id"`, `tokenEmailMatchesProfileEmail: true`) were **not supplied** |
+| **P1.4b** secondary account in the same profile | **BLOCKED** | No stable Chrome API enumerates or obtains a non-primary `AccountInfo` (`getAccounts` is dev-channel only). Not emulated. Product rule: one Chrome profile per Gmail account |
+| P1.5 remove cached token → silent renewal | **PASS (reported)** | You reported PASS based on your popup log; log text not present in the session |
+| P1.6 tokeninfo `aud` / `email` / `scope` | **PENDING** (until independently verified) | Need `aud` = Client ID and `scope` = exactly the 3 approved scopes from a tokeninfo log line (P1.7's interactive step returned tokeninfo HTTP 200, but the values weren't supplied) |
+| **P1.7** revoke → silent call fails → interactive re-consent | **PASS** | Supplied evidence: **revoke HTTP 200**; subsequent silent token **failed with "OAuth2 not granted or revoked"**; interactive token then **succeeded (HTTP 200)** |
+| **P1.8** 7-day Testing-mode authorization expiry | **PENDING: due 2026-11-10** | Click "P1.3 Silent token" on or after 2026-11-10 (7 days after the latest consent; re-consent during P1.7 resets the clock, so use the P1.7 re-consent date) and record what happens |
+
+**Overall P1:**
+- Sign-in, revocation and re-consent work on stable Chrome 156: P1.7 PASS with quoted evidence.
+- P1.1, P1.2, P1.3, P1.4a and P1.5 are PASS (reported), with log text not in the session.
+- P1.4b is BLOCKED by platform limits.
+- P1.6 is PENDING (values needed).
+- P1.8 is PENDING, due 2026-11-10.
+
+## P3 steps 1–3 (2026-11-04): safe sender, mocked tests, dry run
+**Implementation (spike only):** `spikes/p3-mime/send.ts` (`BatchSender`, `validateRecipients`, `prepareBatch`, `dryRun`), with the popup wired to it (`p3send` via `BatchSender`; new `p3dry` button). Mocked Gmail API tests in `spikes/p3-mime/send.test.ts`; guard tests in `spikes/p1-oauth/guards.test.ts`.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Mocked Gmail API suite (validation, 3-copy success path, partial failures, 401 refresh, 429 backoff, concurrency lock, token scrubbing, dry run) | **PASS** | `send.test.ts` 28 tests; negative controls (no duplicate check, 5xx retry, no lock, no secret scrub) each make tests fail |
+| `dryRun()` cannot call fetch or the send endpoint | **PASS** | Static: takes only `(input, newMessageId)`, and its source has no `fetch`/`deps`/`BatchSender`/`.send(`. Runtime: global `fetch` replaced with a throwing spy during a 3-copy dry run → never called. Guard: the popup's `p3dry` handler never reaches the send path |
+| Real-send path uses `BatchSender` only | **PASS** | The send URL exists only in `send.ts`; the popup's only send is `sender.send(...)`; its other `fetch` calls are Google `tokeninfo`/`revoke` |
+| **Manual dry run in Chrome** (reported by you, 2026-11-04) | **PASS (reported)** | `P3 DRY RUN` returned `ok: true`; one MIME message generated; recipient parsing and Unicode subject encoding worked; multipart with text/plain + text/html; Message-ID and placeholder pixel generated; **no email sent**; extension ID correct. Raw output not pasted |
+| Dry-run output exposes no token | **PASS** | Offline regeneration with the popup's exact input: no `Bearer`, `authorization` or `ya29.` in the dry-run JSON (the request body shows only `<N base64url chars>`). Guard test asserts the same |
+
+**Offline MIME review** (same input as the popup, synthetic addresses, regenerated with `dryRun()`):
+- Headers: `From`, `To` (single recipient), RFC 2047 `Subject` decoding exactly to `P3 spike Résumé ✓ 測試`, `Message-ID <…@tracklet.invalid>`, `MIME-Version`, `multipart/alternative`.
+- Parts: text/plain with the link spelled out; text/html with the 1×1 placeholder pixel (`https://example.com/p3-no-tracking.gif`) as the first element.
+- Only CRLF line endings; longest line 82 characters (limit 998).
+- **Findings:**
+  - (a) **No `Date:` header.** RFC 5322 requires one from the originator. The builder supports `date`, but `send.ts` doesn't pass it. Gmail usually adds Date on send (VERIFIED M-e: not stated in docs); confirm in live P3.1 or pass a date.
+  - (b) The `.invalid` Message-ID domain is RFC-valid but cosmetic; whether Gmail keeps or replaces client Message-IDs is P3.3.
+  - (c) The HTML part is a fragment (no `<html><body>`), which clients accept; the pixel is inserted at the very top.
+
+**Open before any live P3 send:**
+1. `p3send` reads the recipient box twice (once for the confirm dialog, again after awaiting `tokeninfo`), so an edit in between would send to an unconfirmed list. **Must fix.**
+2. The confirm dialog appears before validation (nothing is sent on an invalid list, but it's misleading).
+3. Decide on the `Date:` header.
 
 ## P3 — MIME and threading
 | Test | Result | Notes |

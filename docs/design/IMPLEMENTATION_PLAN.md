@@ -57,7 +57,7 @@ Layers per ARCHITECTURE §5.5: in-page pixel neutralisation, `/v1/views` ±90 s 
 ---
 
 ## Phase P — Prototype and validation spikes (before Phase 1 features)
-> **Rev 3:** detailed steps, expected results and pass criteria for every spike are in `PROTOTYPE_TEST_PLAN.md`, which supersedes the summary table below. Account setup is in `SETUP_GOOGLE_CLOUD.md` and `SETUP_CLOUDFLARE.md`; cited facts are in `VERIFIED_PLATFORM_FACTS.md`. P1 tests the D2 variant chosen in OPEN_QUESTIONS Q14.
+> **Rev 3:** detailed steps, expected results and pass criteria for every spike are in `docs/testing/PROTOTYPE_TEST_PLAN.md`, which supersedes the summary table below. Account setup is in `docs/setup/SETUP_GOOGLE_CLOUD.md` and `docs/setup/SETUP_CLOUDFLARE.md`; cited facts are in `docs/design/VERIFIED_PLATFORM_FACTS.md`. P1 tests the D2 variant chosen in OPEN_QUESTIONS Q14.
 Throwaway code in a `spikes/` folder; nothing is shipped from it.
 
 | Spike | Validates | Pass criteria |

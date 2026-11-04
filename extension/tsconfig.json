@@ -1,8 +1,22 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM"],
-    "types": ["chrome", "vite/client"]
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "chrome",
+      "vite/client"
+    ],
+    "jsx": "react-jsx"
   },
-  "include": ["src", "vite.config.ts", "manifest.base.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "manifest.base.ts"
+  ],
+  "exclude": [
+    "src/lib/e2e-local.test.ts"
+  ]
 }

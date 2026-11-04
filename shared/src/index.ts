@@ -1,4 +1,8 @@
-// Shared constants used by both the extension and the backend.
+// Shared constants and helpers used by both the extension and the backend.
+export * from './api';
+export * from './html';
+export * from './ids';
+export * from './url';
 
 /** The only OAuth scopes the product may request (OPEN_QUESTIONS Q14). */
 export const OAUTH_SCOPES = [

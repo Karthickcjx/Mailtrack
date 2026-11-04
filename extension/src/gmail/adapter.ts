@@ -37,6 +37,8 @@ export interface ComposeHandle {
   addButton(label: string, onClick: () => void): () => void;
   /** Closes the compose window. Whether a draft remains is implementation-specific (see spike P2.7). */
   close(): void;
+  /** Optional: discard the draft via Gmail's own Discard control. Returns false if the control wasn't found. */
+  discard?(): boolean;
 }
 
 export type ThreadMarkState = 'sent' | 'likely_opened' | 'clicked' | 'suspected_only' | 'not_sent';

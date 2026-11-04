@@ -25,6 +25,7 @@ export const SELECTORS = {
   rowThreadId: '[data-thread-id]:not(.tracklet-mark)',
   rowMarkTarget: 'td.yX, td.xY',
   openThreadHeading: 'h2[data-legacy-thread-id]',
+  discardButton: '[aria-label^="Discard draft"], [data-tooltip^="Discard draft"]',
 } as const;
 
 const FIELDS = ['to', 'cc', 'bcc'] as const;
@@ -90,6 +91,13 @@ class NativeCompose implements ComposeHandle {
     body?.focus();
     (body ?? this.root).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true } as KeyboardEventInit));
   }
+  /** Clicks Gmail's own "Discard draft" control in THIS compose (label observed live in P2: "Discard draft (Ctrl-Shift-D)"). */
+  discard(): boolean {
+    const btn = this.root.querySelector<HTMLElement>(SELECTORS.discardButton);
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }
 }
 
 export class NativeDomAdapter implements GmailUiAdapter {
@@ -101,7 +109,11 @@ export class NativeDomAdapter implements GmailUiAdapter {
   private cleanups: (() => void)[] = [];
   rowStats = { rows: 0, withId: 0, totalMarks: 0 };
 
-  constructor(private readonly doc: Document = document) {}
+  /**
+   * @param markUntracked  true (P2 harness default) paints a mark on every identified row;
+   *                       false (product) marks only threads present in setThreadMarks() and removes stale marks.
+   */
+  constructor(private readonly doc: Document = document, private readonly markUntracked = true) {}
 
   ready(): Promise<void> {
     if (this.doc.readyState !== 'loading') return Promise.resolve();
@@ -131,6 +143,20 @@ export class NativeDomAdapter implements GmailUiAdapter {
     this.timer ??= window.setInterval(() => this.paintRows(), 1500);
   }
 
+  /** Thread IDs of visible list rows (hidden cached views excluded), max 50. */
+  visibleThreadIds(): string[] {
+    const out = new Set<string>();
+    this.doc.querySelectorAll<HTMLTableRowElement>(SELECTORS.threadRow).forEach((row) => {
+      if (out.size >= 50 || !row.isConnected || row.offsetParent === null) return;
+      const id = threadIdFromAttrs({
+        legacy: row.querySelector(SELECTORS.rowLegacyId)?.getAttribute('data-legacy-thread-id') ?? null,
+        threadId: row.querySelector(SELECTORS.rowThreadId)?.getAttribute('data-thread-id') ?? null,
+      });
+      if (id) out.add(id);
+    });
+    return [...out];
+  }
+
   paintRows(): void {
     let rows = 0, withId = 0;
     this.doc.querySelectorAll<HTMLTableRowElement>(SELECTORS.threadRow).forEach((row) => {
@@ -143,6 +169,7 @@ export class NativeDomAdapter implements GmailUiAdapter {
       withId++;
       const state = this.marks.get(id);
       let mark = row.querySelector<HTMLSpanElement>('.tracklet-mark');
+      if (!state && !this.markUntracked) { mark?.remove(); return; }   // product: only tracked threads are marked
       if (!mark) {
         const target = row.querySelector(SELECTORS.rowMarkTarget) ?? row.lastElementChild;
         if (!target) return;

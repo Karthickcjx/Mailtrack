@@ -13,7 +13,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p spikes/tsconfig.json",
     "secret-scan": "node scripts/secret-scan.mjs",
     "check": "npm run typecheck && npm test && npm run build && npm run secret-scan",
-    "ext:key": "node tools/extension-key.mjs"
+    "ext:key": "node scripts/extension-key.mjs"
   },
   "engines": {
     "node": ">=20"

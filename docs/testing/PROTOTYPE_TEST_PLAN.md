@@ -8,7 +8,7 @@ Accounts:
 - **A** = your tracking Gmail (sender).
 - **B** = the second Gmail account (recipient).
 
-"Fact refs" point to `VERIFIED_PLATFORM_FACTS.md`.
+"Fact refs" point to `docs/design/VERIFIED_PLATFORM_FACTS.md`.
 
 ## Prerequisite matrix
 | Spike | Google Cloud project | Cloudflare account | Other needs | Can start now? |

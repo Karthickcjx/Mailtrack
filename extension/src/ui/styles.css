@@ -1,0 +1,47 @@
+:root {
+  --bg: #f6f7fb; --panel: #ffffff; --text: #1f2328; --muted: #5f6368; --line: #e3e6ec;
+  --accent: #2f5bea; --accent-weak: #e8eefe; --good: #137333; --good-bg: #e6f4ea; --warn: #b06000; --warn-bg: #fef7e0;
+  --bad: #c5221f; --bad-bg: #fce8e6; --info: #1a5fb4; --info-bg: #e8f0fe; --radius: 12px;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111318; --panel: #1b1e25; --text: #e7e9ee; --muted: #9aa0a6; --line: #2c313b; --accent: #8ab4f8; --accent-weak: #1f2a44;
+    --good: #81c995; --good-bg: #16301f; --warn: #fdd663; --warn-bg: #3a3014; --bad: #f28b82; --bad-bg: #3c1f1e; --info: #8ab4f8; --info-bg: #1c2a44; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 6px 12px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button:disabled { opacity: .55; cursor: default; }
+input, select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px; }
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.brand { font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+.brand span { color: var(--accent); }
+.spacer { flex: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.card .v { font-size: 26px; font-weight: 700; }
+.card .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.notice { background: var(--warn-bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+.err { background: var(--bad-bg); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar input { flex: 1; min-width: 200px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px; border-bottom: 1px solid var(--line); }
+td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr.row { cursor: pointer; } tr.row:hover td { background: var(--accent-weak); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tone-good { background: var(--good-bg); color: var(--good); } .tone-info { background: var(--info-bg); color: var(--info); }
+.tone-warn { background: var(--warn-bg); color: var(--warn); } .tone-muted { background: var(--line); color: var(--muted); } .tone-bad { background: var(--bad-bg); color: var(--bad); }
+.tabs { display: flex; gap: 4px; }
+.tabs button.on { background: var(--accent-weak); border-color: var(--accent); color: var(--accent); }
+.empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+.field { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; vertical-align: -2px; }
+@keyframes s { to { transform: rotate(360deg); } }
+.popup { width: 340px; padding: 16px; }

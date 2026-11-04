@@ -1,16 +1,24 @@
-# Phase 0: LOCAL DEVELOPMENT ONLY. Nothing is deployed (no `wrangler deploy` until approved).
+# Tracklet backend — LOCAL DEVELOPMENT CONFIG. Nothing is deployed until you approve a deployment.
+# Secrets are NOT in this file:
+#   local:  backend/.dev.vars (gitignored) — see backend/.dev.vars.example
+#   remote: wrangler secret put SESSION_SIGNING_KEY | IP_HASH_SALT | ALLOWED_GOOGLE_SUBS
 name = "t"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
-workers_dev = false   # keep the workers.dev route disabled until a deployment is approved
+workers_dev = false   # keep the public workers.dev route disabled until a deployment is approved
+
+[vars]
+APP_VERSION = "0.1.0"
+GOOGLE_CLIENT_ID = "766181300541-7qb1k5fe28rr2u6mcbi6pifmetjs6leq.apps.googleusercontent.com"   # public identifier
+EXTENSION_ORIGIN = "chrome-extension://hhejoehmmjbjahinnpgnfhfakbkhilcd"
+PUBLIC_BASE_URL = "http://127.0.0.1:8787"   # local only; set to the https workers.dev URL when deploying
 
 [[d1_databases]]
 binding = "DB"
 database_name = "tracklet"
-# Placeholder ID: only the local (Miniflare) database is used in Phase 0.
-# The real ID is filled in after `wrangler d1 create` in an approved phase.
+# Placeholder ID: only the local (Miniflare) database is used until a deployment is approved.
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
-[vars]
-APP_VERSION = "0.0.1"
+[triggers]
+crons = ["17 3 * * *"]   # daily retention: events 180 d, sender views 24 h, caps/rate windows

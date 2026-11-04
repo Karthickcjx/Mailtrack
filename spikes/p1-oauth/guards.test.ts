@@ -74,6 +74,14 @@ describe('P1 harness uses only stable, documented chrome.identity APIs', () => {
     expect(code).toMatch(/details\.account = \{ id: accountId \}/);
   });
 
+  it('P3 dry run never reaches the send path; real send goes only through BatchSender', () => {
+    const dry = code.slice(code.indexOf('async p3dry()'), code.indexOf('async p3send()'));
+    expect(dry.length).toBeGreaterThan(0);
+    expect(dry).not.toMatch(/sender\.send|fetch\(|messages\/send/);
+    expect(code).not.toMatch(/gmail\.googleapis\.com\/gmail\/v1\/users\/me\/messages\/send/); // URL lives in send.ts only
+    expect(code).toMatch(/sender\.send\(/);
+  });
+
   it('spike permissions are unchanged: identity + identity.email only', () => {
     const m = build.match(/permissions:\s*\[([^\]]*)\]/);
     expect([...(m?.[1] ?? '').matchAll(/'([^']+)'/g)].map((x) => x[1])).toEqual(['identity', 'identity.email']);

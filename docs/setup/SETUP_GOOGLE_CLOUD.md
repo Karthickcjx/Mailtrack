@@ -1,7 +1,7 @@
 # CHECKLIST — Google Cloud project and OAuth client (performed by you)
 
 Claude does **not** perform these steps.
-- Facts are cited from `VERIFIED_PLATFORM_FACTS.md`.
+- Facts are cited from `docs/design/VERIFIED_PLATFORM_FACTS.md`.
 - Console labels change over time. If a label differs, follow the closest equivalent and note it in `spikes/RESULTS.md`.
 - Account: the **consumer @gmail.com account you will track from** (D1). Use the same account for the console, so you are automatically the owner.
 

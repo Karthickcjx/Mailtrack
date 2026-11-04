@@ -3,8 +3,8 @@
 // and prints the public "key" for manifest.json plus the derived extension ID.
 //
 // Key location: $TRACKLET_KEY_PATH or ~/.tracklet/extension-key.pem
-// Usage:  node tools/extension-key.mjs            -> print public key + ID
-//         node tools/extension-key.mjs --write    -> also write extension/manifest.key.json
+// Usage:  node scripts/extension-key.mjs            -> print public key + ID
+//         node scripts/extension-key.mjs --write    -> also write extension/manifest.key.json
 import { generateKeyPairSync, createPrivateKey, createPublicKey, createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

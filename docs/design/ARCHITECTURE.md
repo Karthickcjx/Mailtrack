@@ -16,15 +16,15 @@ Status: **REVISED DRAFT (rev 3), awaiting approval.** No code, packages, account
 > - The MIME builder design was validated offline (RFC 2047, CRLF, single-recipient copies, threading headers, injection rejection). Live Gmail behaviour is still pending P3.
 > - D1 batch + counter consistency was validated locally (P6.2).
 >
-> **Rev 4 (2026-11-03): D2 decided.** `chrome.identity.getAuthToken()` with a Google **Chrome Extension** OAuth client (Q14 approved). Interactive consent happens only on an explicit user click. `launchWebAuthFlow` is a fallback only, used if P1 fails and you approve it. Chrome caches and renews access tokens automatically, but **renewal does not replace consent**: Testing-mode authorizations expire 7 days after consent (O8/V-a), and revocation or a Google password change also require re-consent (O9). The UI must handle "consent required" at any time. Extension ID: a locally generated key (Q15), per `docs/EXTENSION_ID.md`. InboxSDK: evaluation only, no registration (Q16).
+> **Rev 4 (2026-11-03): D2 decided.** `chrome.identity.getAuthToken()` with a Google **Chrome Extension** OAuth client (Q14 approved). Interactive consent happens only on an explicit user click. `launchWebAuthFlow` is a fallback only, used if P1 fails and you approve it. Chrome caches and renews access tokens automatically, but **renewal does not replace consent**: Testing-mode authorizations expire 7 days after consent (O8/V-a), and revocation or a Google password change also require re-consent (O9). The UI must handle "consent required" at any time. Extension ID: a locally generated key (Q15), per `docs/setup/EXTENSION_ID.md`. InboxSDK: evaluation only, no registration (Q16).
 >
-> **Rev 3 (2026-11-03): documentation check.** Platform claims were checked against official documentation; see `VERIFIED_PLATFORM_FACTS.md` for quotes and source URLs. Corrections are listed in `OPEN_QUESTIONS.md` ("Corrections"). Key points:
+> **Rev 3 (2026-11-03): documentation check.** Platform claims were checked against official documentation; see `docs/design/VERIFIED_PLATFORM_FACTS.md` for quotes and source URLs. Corrections are listed in `docs/design/OPEN_QUESTIONS.md` ("Corrections"). Key points:
 > - **D2 is under review (Q14).** Google calls the implicit flow legacy and "strongly discouraged" (O1) and recommends the Chrome Extension client type for extensions (O5). The proposed **D2-rev** (`getAuthToken` + Chrome Extension client) is **not applied until you approve it.**
 > - The Gmail quota is 6,000 units/min/user (M-f), not 250 units/s; the send throttle is relaxed to ≥ 1 s between copies (well under the limit, which keeps the service worker active).
 > - Message-ID preservation, Bcc handling and the size limit are **not stated** in the official docs (M-e) and stay prototype items.
 > - Testing-mode 7-day expiry confirmed (O8); `gmail.send` confirmed Sensitive and restricted scopes confirmed (M-a); a security assessment applies to restricted-scope data stored or transmitted by servers (V-f).
 > - Cloudflare Free limits confirmed (W-a…W-g); Rate Limiting binding availability on Free is unconfirmed (W-i).
-Inputs: `RECONNAISSANCE.md` (REA inspection) and the critical review in §1. This is an independent design; it reuses no Mailsuite code, assets, branding or UI text.
+Inputs: `docs/design/RECONNAISSANCE.md` (REA inspection) and the critical review in §1. This is an independent design; it reuses no Mailsuite code, assets, branding or UI text.
 
 Labels used throughout:
 - **[FACT]**: documented platform behaviour I am confident of. It still gets a quick check in the prototype.

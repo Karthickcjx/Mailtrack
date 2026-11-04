@@ -114,3 +114,21 @@ d('P2.10 under strict Trusted Types (headless Chrome)', () => {
     expect(r.errors).toEqual([]);
   }, 120_000);
 });
+
+// Product build (not a spike artefact): extension/dist/content.js must run under strict Trusted Types.
+d('Product content script (extension/dist/content.js) under strict Trusted Types', () => {
+  const built = resolve(__dirname, '../../../extension/dist/content.js');
+  beforeAll(() => {
+    execFileSync(process.execPath, [resolve(__dirname, '../../../node_modules/vite/bin/vite.js'), 'build', '--configLoader', 'runner'],
+      { cwd: resolve(__dirname, '../../../extension'), stdio: 'ignore' });
+  }, 120_000);
+
+  it('no violations or errors; tracked-send buttons only on NEW composes; text-only', async () => {
+    const r = await runTT(built, 'compose');
+    expect(r.violations).toEqual([]);
+    expect(r.errors).toEqual([]);
+    const buttons = r.probe.buttons as { compose: string; text: string }[];
+    expect(buttons.filter((b) => b.compose === 'popup').map((b) => b.text).sort()).toEqual(['Preview tracking', 'Send tracked']);
+    expect(buttons.filter((b) => b.compose === 'inline-reply' || b.compose === 'inline-forward')).toEqual([]);
+  }, 120_000);
+});

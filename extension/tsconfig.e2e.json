@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": { "lib": ["ES2022", "DOM"], "types": ["chrome", "@cloudflare/workers-types", "node"] },
+  "include": ["src/lib/e2e-local.test.ts"]
+}

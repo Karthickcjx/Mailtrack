@@ -1,4 +1,4 @@
--- 0001_init.sql — schema from DATABASE_SCHEMA.md rev 2.
+-- 0001_init.sql — schema from docs/design/DATABASE_SCHEMA.md rev 2.
 -- Privacy defaults: no subjects / readable recipient addresses unless the user opts in (D10, D11).
 
 CREATE TABLE users (
