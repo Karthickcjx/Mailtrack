@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "db:migrate:local": "wrangler d1 migrations apply tracklet --local",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "deploy": "node ../scripts/preflight.mjs backend && wrangler deploy --env production",
+    "db:migrate:prod": "wrangler d1 migrations apply tracklet --env production --remote"
   },
   "dependencies": {
     "@tracklet/shared": "*",

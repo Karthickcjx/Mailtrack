@@ -13,10 +13,12 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p spikes/tsconfig.json",
     "secret-scan": "node scripts/secret-scan.mjs",
     "check": "npm run typecheck && npm test && npm run build && npm run secret-scan",
-    "ext:key": "node scripts/extension-key.mjs"
+    "ext:key": "node scripts/extension-key.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "release": "npm run check && npm run preflight && npm run build:release --workspace extension"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.7",

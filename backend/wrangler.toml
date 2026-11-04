@@ -1,24 +1,54 @@
-# Tracklet backend — LOCAL DEVELOPMENT CONFIG. Nothing is deployed until you approve a deployment.
-# Secrets are NOT in this file:
-#   local:  backend/.dev.vars (gitignored) — see backend/.dev.vars.example
-#   remote: wrangler secret put SESSION_SIGNING_KEY | IP_HASH_SALT | ALLOWED_GOOGLE_SUBS
+# Tracklet backend (Cloudflare Workers + D1).
+#
+# Two environments:
+#   (top level)        LOCAL DEVELOPMENT: `npm run dev --workspace backend` (wrangler dev, local D1 file)
+#   [env.production]   PRODUCTION:        `npm run deploy --workspace backend` (wrangler deploy --env production)
+#
+# Secrets are NEVER in this file:
+#   local:      backend/.dev.vars (gitignored); see backend/.dev.vars.example
+#   production: npx wrangler secret put <NAME> --env production
+#               for SESSION_SIGNING_KEY, IP_HASH_SALT and ALLOWED_GOOGLE_SUBS
+# Before deploying, `npm run preflight` must pass (it rejects the placeholders below).
+
 name = "t"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
-workers_dev = false   # keep the public workers.dev route disabled until a deployment is approved
+workers_dev = false   # local config: never routed publicly
 
 [vars]
 APP_VERSION = "0.1.0"
 GOOGLE_CLIENT_ID = "766181300541-7qb1k5fe28rr2u6mcbi6pifmetjs6leq.apps.googleusercontent.com"   # public identifier
 EXTENSION_ORIGIN = "chrome-extension://hhejoehmmjbjahinnpgnfhfakbkhilcd"
-PUBLIC_BASE_URL = "http://127.0.0.1:8787"   # local only; set to the https workers.dev URL when deploying
+PUBLIC_BASE_URL = "http://127.0.0.1:8787"   # local only: the extension refuses real tracked sends on this
 
 [[d1_databases]]
 binding = "DB"
 database_name = "tracklet"
-# Placeholder ID: only the local (Miniflare) database is used until a deployment is approved.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "00000000-0000-0000-0000-000000000000"   # local (Miniflare) database only
 migrations_dir = "migrations"
 
 [triggers]
 crons = ["17 3 * * *"]   # daily retention: events 180 d, sender views 24 h, caps/rate windows
+
+# ---------------------------------------------------------------------------------------------
+# PRODUCTION. Fill the two REPLACE_ values, then run `npm run preflight`.
+# The Worker is served at https://<name>.<your-subdomain>.workers.dev. The short name keeps tracking URLs short.
+[env.production]
+name = "t"
+workers_dev = true
+preview_urls = false
+
+[env.production.vars]
+APP_VERSION = "0.1.0"
+GOOGLE_CLIENT_ID = "766181300541-7qb1k5fe28rr2u6mcbi6pifmetjs6leq.apps.googleusercontent.com"
+EXTENSION_ORIGIN = "chrome-extension://hhejoehmmjbjahinnpgnfhfakbkhilcd"
+PUBLIC_BASE_URL = "https://REPLACE_WITH_WORKER_HOST"   # e.g. https://t.yourname.workers.dev (no trailing slash)
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "tracklet"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"   # printed by: npx wrangler d1 create tracklet
+migrations_dir = "migrations"
+
+[env.production.triggers]
+crons = ["17 3 * * *"]

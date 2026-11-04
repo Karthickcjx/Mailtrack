@@ -5,7 +5,8 @@
   "scripts": {
     "build": "vite build --configLoader runner",
     "dev": "vite build --watch --mode development --configLoader runner",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.e2e.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.e2e.json",
+    "build:release": "node ../scripts/preflight.mjs extension && vite build --mode release --configLoader runner"
   },
   "dependencies": {
     "@tracklet/shared": "*",

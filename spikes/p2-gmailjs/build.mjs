@@ -26,7 +26,8 @@ const h = createHash('sha256').update(`variant=${adapter}\n${JSON.stringify(vers
 for (const f of sources) h.update(`--${f}--\n`).update(readFileSync(join(root, f), 'utf8').replace(/\r\n/g, '\n'));
 const buildId = `${adapter}-${h.digest('hex').slice(0, 12)}`;
 
-const out = join(here, `dist-${adapter}`);
+// P2_OUT_DIR lets a test build into its own folder (parallel test files must not share dist-<adapter>).
+const out = process.env.P2_OUT_DIR ?? join(here, `dist-${adapter}`);
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 await build({

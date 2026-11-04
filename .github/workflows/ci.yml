@@ -1,0 +1,37 @@
+# Continuous integration: typecheck, all tests (incl. strict Trusted Types runs in headless Chrome),
+# extension build and secret scan on every push and pull request. Never deploys, never needs secrets.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Ubuntu 24.04 restricts unprivileged user namespaces via AppArmor, which Chrome's sandbox needs.
+      # Re-allow them on the throwaway runner (keeps Chrome sandboxed; no --no-sandbox flag).
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          CHROME_PATH: /usr/bin/google-chrome   # preinstalled on GitHub-hosted Ubuntu runners
+      - run: npm run build
+      - run: npm run secret-scan
+      - run: npm audit --audit-level=high

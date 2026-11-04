@@ -43,3 +43,33 @@ Never share passwords, 2FA codes or API tokens.
 ## F. Things you must NOT do
 - ☐ Do not deploy anything, and do not paste code from elsewhere into the dashboard editor.
 - ☐ Do not enable paid add-ons (Workers Paid, Logpush, etc.).
+
+## G. Production deployment (after sections A–C, with your approval)
+
+Everything stays on the Free plan. Run all commands from the repository root unless a step says otherwise.
+
+1. **Log in:** run `cd backend`, then `npx wrangler login` (this opens the browser).
+2. **Create the database:** `npx wrangler d1 create tracklet`. Copy the printed `database_id` into `backend/wrangler.toml` under `[[env.production.d1_databases]]`.
+3. **Set the public URL:** in `backend/wrangler.toml`, under `[env.production.vars]`, set `PUBLIC_BASE_URL = "https://t.<your-subdomain>.workers.dev"`. Use no trailing slash; the first label comes from `name` in `[env.production]`.
+4. **Apply the schema:** `npm run db:migrate:prod --workspace backend`.
+5. **Set the secrets.** You'll be prompted for each value; they are never written to disk or Git:
+   ```sh
+   cd backend
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"   # use one output per secret
+   npx wrangler secret put SESSION_SIGNING_KEY --env production
+   npx wrangler secret put IP_HASH_SALT --env production
+   npx wrangler secret put ALLOWED_GOOGLE_SUBS --env production   # your Google account ID (README step 6)
+   ```
+6. **Configure the extension:** create `extension/.env.release.local` (gitignored) containing:
+   ```
+   TRACKLET_OAUTH_CLIENT_ID=<same as GOOGLE_CLIENT_ID in wrangler.toml>
+   TRACKLET_API_BASE=https://t.<your-subdomain>.workers.dev
+   ```
+7. **Check:** `npm run preflight` must print `preflight: ready`. It rejects placeholders, http or local URLs, an extension ID mismatch, and a client ID mismatch.
+8. **Deploy:** `npm run deploy --workspace backend`. This runs the backend preflight first, then `wrangler deploy --env production`.
+9. **Verify:** `curl https://t.<your-subdomain>.workers.dev/health` should return `{"status":"ok",…}`.
+10. **Build the extension:** `npm run release`. This runs check + preflight + release build. Then reload `extension/dist` in `chrome://extensions`.
+11. **Smoke test:** send one tracked email to an address you own and open it. The dashboard should show 1 opened within about a minute. Watch the live logs with `npx wrangler tail --env production` (in `backend/`); `[tracklet-track]` lines confirm pixel requests, and they never contain tokens or addresses.
+
+**Rollback:** run `npx wrangler rollback --env production` (in `backend/`). The extension keeps working against the previous Worker version.
+**Revoke access immediately:** remove an ID with `npx wrangler secret put ALLOWED_GOOGLE_SUBS --env production`. Every request re-checks the allowlist.

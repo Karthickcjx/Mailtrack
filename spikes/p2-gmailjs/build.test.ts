@@ -1,16 +1,19 @@
 // Build reproducibility and identity for both P2 variants.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const dir = __dirname;
+// Each build goes to a private temp folder: tt.test.ts rebuilds dist-<variant> in parallel, and sharing it made this test flaky.
 const buildInfo = (v: string) => {
-  execFileSync(process.execPath, [resolve(dir, 'build.mjs'), v], { stdio: 'ignore' });
+  const out = mkdtempSync(resolve(tmpdir(), `tracklet-p2-${v}-`));
+  execFileSync(process.execPath, [resolve(dir, 'build.mjs'), v], { stdio: 'ignore', env: { ...process.env, P2_OUT_DIR: out } });
   return {
-    info: JSON.parse(readFileSync(resolve(dir, `dist-${v}/build-info.json`), 'utf8')) as { buildId: string; pageSha256: string; sinks: number; versions: Record<string, string>; variant: string },
-    manifest: JSON.parse(readFileSync(resolve(dir, `dist-${v}/manifest.json`), 'utf8')) as { permissions: string[]; content_scripts: { world: string; run_at: string }[]; host_permissions?: unknown },
-    page: readFileSync(resolve(dir, `dist-${v}/page.js`), 'utf8'),
+    info: JSON.parse(readFileSync(resolve(out, 'build-info.json'), 'utf8')) as { buildId: string; pageSha256: string; sinks: number; versions: Record<string, string>; variant: string },
+    manifest: JSON.parse(readFileSync(resolve(out, 'manifest.json'), 'utf8')) as { permissions: string[]; content_scripts: { world: string; run_at: string }[]; host_permissions?: unknown },
+    page: readFileSync(resolve(out, 'page.js'), 'utf8'),
   };
 };
 

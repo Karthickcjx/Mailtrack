@@ -97,3 +97,18 @@ The branch was `phase-p-and-0` at `1f2bbc2`, and every commit was local.
 - [ ] G4 backend deploy (approval) and `TRACKLET_API_BASE` set to the https URL, then rebuild
 - [ ] G5 live open and click across clients
 - [ ] G7 P1.8 on 2026-11-10
+
+## 7. Production hardening (2026-11-04, later)
+
+| Item | Status |
+|---|---|
+| `wrangler.toml` `[env.production]` separate from local dev (`workers_dev`, own D1 binding, https `PUBLIC_BASE_URL`, cron) | ✅ validated with `wrangler deploy --env production --dry-run` (nothing uploaded) |
+| `npm run preflight`: rejects placeholder D1 ID and URL, http/local URLs, extension ID mismatch, OAuth client mismatch between extension and backend | ✅ fails on the current placeholders (4 problems); passes on a sample valid config |
+| `npm run deploy --workspace backend` runs the backend preflight before `wrangler deploy` | ✅ wired (not executed: needs `wrangler login` and approval) |
+| `npm run release`: check + preflight + extension release build; the release build also refuses non-https API or a missing client ID by itself | ✅ blocked as intended until production values exist |
+| Real tracked sends refused when tracking URLs are not public https | ✅ (regression from the live test) |
+| CI (`.github/workflows/ci.yml`): typecheck, tests including headless-Chrome Trusted Types, build, secret scan, `npm audit --audit-level=high` | ✅ written; YAML validated; first run happens on push |
+| Node version: `engines >=22.13` (needed by `node:sqlite` in tests), `.nvmrc` 24, lockfile re-synced for `npm ci` | ✅ |
+| Production runbook with rollback and instant revocation | ✅ docs/setup/SETUP_CLOUDFLARE.md § G |
+
+Remaining before go-live (yours): G4 (`wrangler login`, D1 create, secrets, deploy), then G2/G3/G5 live checks, and G7 (P1.8, due 2026-11-10).

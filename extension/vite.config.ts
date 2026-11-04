@@ -40,6 +40,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, here, 'TRACKLET_');
   const apiBase = (env.TRACKLET_API_BASE || 'http://127.0.0.1:8787').replace(/\/+$/, '');
   apiHostPattern(apiBase);   // fail the build on a non-https / non-origin API base
+  if (mode === 'release' && (!apiBase.startsWith('https://') || !env.TRACKLET_OAUTH_CLIENT_ID)) {
+    throw new Error('release build needs TRACKLET_API_BASE=https://… and TRACKLET_OAUTH_CLIENT_ID in extension/.env.release.local (run npm run preflight)');
+  }
   return {
     root: resolve(here, 'src'),
     publicDir: resolve(here, 'public'),

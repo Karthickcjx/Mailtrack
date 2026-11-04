@@ -8,7 +8,7 @@ It has two parts:
 
 Tracklet is built for **one person, or a short allowlist of Google accounts**. It is not a multi-tenant service.
 
-> **Status:** working MVP, verified locally. Real open and click tracking needs the backend deployed at a public **https** address (see [step 4](#4-run-the-backend)). See [docs/release/RELEASE_READINESS.md](docs/release/RELEASE_READINESS.md).
+> **Status:** production-ready code, CI on every push, verified locally. Real open and click tracking needs the backend deployed at a public **https** address (see [step 4](#4-run-the-backend)). See [docs/release/RELEASE_READINESS.md](docs/release/RELEASE_READINESS.md).
 
 ---
 
@@ -91,7 +91,7 @@ Mailtrack/
 ### What you need
 
 - Google Chrome (stable). Use **one Chrome profile per Gmail account**.
-- Node.js 20 or newer.
+- Node.js 22.13 or newer (24 LTS recommended; see `.nvmrc`).
 - A Google Cloud project with a **Chrome Extension** OAuth client.
 - A free Cloudflare account, for real tracking.
 
@@ -140,12 +140,18 @@ npm run dev --workspace backend                     # → http://127.0.0.1:8787
 
 > ⚠️ **A local backend cannot track real emails.** Gmail loads images through Google's image proxy, which runs on Google's servers, and recipients' devices can't reach your `127.0.0.1` either. Tracklet therefore **refuses to send** a tracked email whose tracking URLs aren't public https. **Preview tracking** still works locally.
 
-**Deployed, for real tracking.** Follow [docs/setup/SETUP_CLOUDFLARE.md](docs/setup/SETUP_CLOUDFLARE.md):
-1. Run `wrangler d1 create tracklet`, then put the database ID in `backend/wrangler.toml`.
-2. Apply the migrations with `--remote`.
-3. Set the secrets with `wrangler secret put …`: `SESSION_SIGNING_KEY`, `IP_HASH_SALT` and `ALLOWED_GOOGLE_SUBS`.
-4. Set `PUBLIC_BASE_URL` in `wrangler.toml` to the https Worker URL, then deploy.
-5. Set `TRACKLET_API_BASE` in `extension/.env.local` to the same https URL and rebuild the extension.
+**Deployed, for real tracking.** The full runbook is [docs/setup/SETUP_CLOUDFLARE.md § G](docs/setup/SETUP_CLOUDFLARE.md#g-production-deployment-after-sections-ac-with-your-approval). In short:
+
+```sh
+cd backend && npx wrangler login && npx wrangler d1 create tracklet && cd ..
+#  → put database_id and PUBLIC_BASE_URL (https://t.<subdomain>.workers.dev) in backend/wrangler.toml [env.production]
+npm run db:migrate:prod --workspace backend
+#  → set secrets: npx wrangler secret put SESSION_SIGNING_KEY | IP_HASH_SALT | ALLOWED_GOOGLE_SUBS --env production (run in backend/)
+#  → create extension/.env.release.local with TRACKLET_OAUTH_CLIENT_ID and TRACKLET_API_BASE=<same https URL>
+npm run preflight                      # must print "preflight: ready"
+npm run deploy --workspace backend     # preflight + wrangler deploy --env production
+npm run release                        # check + preflight + production extension build
+```
 
 ### 5. Build and load the extension
 
@@ -215,6 +221,8 @@ npm test                                 # Vitest: backend, extension, shared, s
 npm run build                            # builds extension/dist
 npm run secret-scan                      # fails on keys/tokens in tracked files or dist
 npm run check                            # all of the above
+npm run preflight                        # production config check (before deploy/release)
+npm run release                          # check + preflight + release build of the extension
 npm run dev --workspace extension        # rebuild extension on change
 npm run dev --workspace backend          # local Worker on :8787
 ```
