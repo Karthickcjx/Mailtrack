@@ -8,7 +8,7 @@ It has two parts:
 
 Tracklet is built for **one person, or a short allowlist of Google accounts**. It is not a multi-tenant service.
 
-> **Status:** production-ready code, CI on every push, verified locally. Real open and click tracking needs the backend deployed at a public **https** address (see [step 4](#4-run-the-backend)). See [docs/release/RELEASE_READINESS.md](docs/release/RELEASE_READINESS.md).
+> **Status:** production-ready code, CI on every push, verified locally. Real open and click tracking needs the backend deployed at a public **https** address (see [Part D](#part-d--deploy-the-backend-to-cloudflare)). See [docs/release/RELEASE_READINESS.md](docs/release/RELEASE_READINESS.md).
 
 ---
 
@@ -16,7 +16,7 @@ Tracklet is built for **one person, or a short allowlist of Google accounts**. I
 
 1. [How it works](#how-it-works)
 2. [Repository layout](#repository-layout)
-3. [How to use Tracklet](#how-to-use-tracklet) (setup steps 1–6, then daily use)
+3. [Step-by-step setup](#step-by-step-setup) (parts A–H) and [daily use](#daily-use)
 4. [Troubleshooting](#troubleshooting)
 5. [Development](#development)
 6. [Security and privacy](#security-and-privacy)
@@ -86,95 +86,206 @@ Mailtrack/
 
 ---
 
-## How to use Tracklet
+## Step-by-step setup
 
-### What you need
+Allow about 45 minutes the first time. Do the parts **in order**: each one produces a value the next part needs.
 
-- Google Chrome (stable). Use **one Chrome profile per Gmail account**.
-- Node.js 22.13 or newer (24 LTS recommended; see `.nvmrc`).
-- A Google Cloud project with a **Chrome Extension** OAuth client.
-- A free Cloudflare account, for real tracking.
+| Part | What you do | What you get |
+|---|---|---|
+| [A](#part-a--install-the-tools) | Install the tools | Node.js, Git, Chrome |
+| [B](#part-b--get-the-code) | Get the code | A working build on your PC |
+| [C](#part-c--google-cloud-oauth-client) | Set up Google Cloud | **OAuth client ID** |
+| [D](#part-d--deploy-the-backend-to-cloudflare) | Deploy the backend | **https Worker URL** |
+| [E](#part-e--build-the-extension) | Build the extension | `extension/dist` |
+| [F](#part-f--load-the-extension-in-chrome) | Load it in Chrome | Tracklet icon in the toolbar |
+| [G](#part-g--sign-in-and-allow-your-account) | Sign in and allow your account | A signed-in popup |
+| [H](#part-h--send-your-first-tracked-email) | Send a test email | Your first tracked open |
 
-### 1. Install
+> Only want to try the interface without real tracking? See [Local-only mode](#local-only-mode-no-deployment).
 
-```sh
-git clone https://github.com/Karthickcjx/Mailtrack.git
-cd Mailtrack
-npm install
-npm run check        # typecheck + all tests + build + secret scan
-```
+---
 
-### 2. Google Cloud OAuth (one time)
+### Part A — Install the tools
 
-Follow [docs/setup/SETUP_GOOGLE_CLOUD.md](docs/setup/SETUP_GOOGLE_CLOUD.md):
-- enable the Gmail API;
-- configure the consent screen, and add yourself as a test user while in Testing mode;
-- create an OAuth client of type **Chrome Extension** for the extension ID **`hhejoehmmjbjahinnpgnfhfakbkhilcd`**.
+1. Install **Node.js 24 LTS** from https://nodejs.org (22.13 or newer works).
+2. Install **Git** from https://git-scm.com.
+3. Install **Google Chrome** (stable).
+4. Use **one Chrome profile per Gmail account**: Tracklet signs in with the profile's main Google account.
+5. Check the tools in a terminal:
+   ```sh
+   node --version     # v22.13 or newer
+   git --version
+   ```
 
-Tracklet asks for only three scopes: `openid`, `userinfo.email` and `gmail.send`. **It cannot read your inbox.** No client secret is used.
+You also need a **Google account** (the Gmail you'll send from) and a free **Cloudflare account** (https://dash.cloudflare.com/sign-up).
 
-### 3. Configure the extension build
+### Part B — Get the code
 
-```sh
-cp extension/.env.example extension/.env.local
-```
+1. Clone the repository and install dependencies:
+   ```sh
+   git clone https://github.com/Karthickcjx/Mailtrack.git
+   cd Mailtrack
+   npm install
+   ```
+2. Check everything works:
+   ```sh
+   npm run check
+   ```
+   ✅ You should see all tests passing and `secret-scan: … 0 finding(s)`.
 
-Edit `extension/.env.local`:
+### Part C — Google Cloud OAuth client
 
-| Setting | Value |
-|---|---|
-| `TRACKLET_OAUTH_CLIENT_ID` | Your Chrome Extension OAuth client ID (`….apps.googleusercontent.com`) |
-| `TRACKLET_API_BASE` | Backend address: `http://127.0.0.1:8787` for local testing, or your **https** Worker URL once deployed |
+Sign into https://console.cloud.google.com with **the Gmail account you'll send from**. Full details are in [docs/setup/SETUP_GOOGLE_CLOUD.md](docs/setup/SETUP_GOOGLE_CLOUD.md).
 
-The extension ID is pinned by the public key in `extension/manifest.key.json`. The private key is never in Git ([docs/setup/EXTENSION_ID.md](docs/setup/EXTENSION_ID.md)).
+1. **Create a project.** Use the project picker → **New Project** (for example `tracklet-personal`), then select it.
+2. **Enable the Gmail API.** Go to **APIs & Services → Library**, search for "Gmail API" and click **Enable**.
+3. **Configure the consent screen.** Go to **APIs & Services → OAuth consent screen** and click **Get started**:
+   - App name `Tracklet`, with your Gmail as the support email;
+   - Audience **External**;
+   - your Gmail as the contact email;
+   - accept the policy and click **Create**.
+4. **Add yourself as a test user.** Under **Audience → Test users**, add your Gmail. Leave the app in **Testing**.
+5. **Add the scopes.** Under **Data Access → Add or remove scopes**, add exactly these three, and save:
+   - `openid`
+   - `https://www.googleapis.com/auth/userinfo.email`
+   - `https://www.googleapis.com/auth/gmail.send`
+6. **Create the OAuth client.** Go to **Clients → Create client**:
+   - Application type **Chrome Extension**;
+   - Name `tracklet-extension`;
+   - **Item ID** `hhejoehmmjbjahinnpgnfhfakbkhilcd`.
+7. Click **Create**. This client type has **no client secret**.
+8. ✅ **Copy the Client ID** (`…apps.googleusercontent.com`). You need it in parts D and E.
 
-### 4. Run the backend
+> The extension ID `hhejoehmmjbjahinnpgnfhfakbkhilcd` is fixed by the public key in `extension/manifest.key.json`, so every build of this repository has the same ID ([details](docs/setup/EXTENSION_ID.md)).
+> Don't add other scopes, create a client secret, or enable billing.
 
-**Local, for trying the UI, sign-in and dry runs:**
+### Part D — Deploy the backend to Cloudflare
 
-```sh
-cp backend/.dev.vars.example backend/.dev.vars      # fill in random values; see comments in the file
-npm run db:migrate:local --workspace backend
-npm run dev --workspace backend                     # → http://127.0.0.1:8787
-```
+All commands run from the repository root unless shown with `cd backend`. The full runbook is [docs/setup/SETUP_CLOUDFLARE.md § G](docs/setup/SETUP_CLOUDFLARE.md#g-production-deployment-after-sections-ac-with-your-approval).
 
-> ⚠️ **A local backend cannot track real emails.** Gmail loads images through Google's image proxy, which runs on Google's servers, and recipients' devices can't reach your `127.0.0.1` either. Tracklet therefore **refuses to send** a tracked email whose tracking URLs aren't public https. **Preview tracking** still works locally.
+1. **Log in to Cloudflare.** This opens the browser:
+   ```sh
+   cd backend
+   npx wrangler login
+   ```
+2. **Create the database** (still in `backend/`):
+   ```sh
+   npx wrangler d1 create tracklet
+   ```
+   ✅ Copy the printed `database_id`.
+3. **Find your workers.dev subdomain.** In the Cloudflare dashboard, open **Workers & Pages**; your account's `<subdomain>.workers.dev` is shown there. A new account is asked to choose one the first time. Recipients can see it in tracking links, so pick something neutral ([details](docs/setup/SETUP_CLOUDFLARE.md#b-choose-the-workersdev-account-subdomain-visible-to-every-recipient)). Your Worker URL will be **`https://t.<subdomain>.workers.dev`**.
+4. **Edit `backend/wrangler.toml`, in the `[env.production]` part only:**
+   ```toml
+   [env.production.vars]
+   GOOGLE_CLIENT_ID = "<your client ID from Part C>"
+   PUBLIC_BASE_URL  = "https://t.<subdomain>.workers.dev"      # no trailing slash
 
-**Deployed, for real tracking.** The full runbook is [docs/setup/SETUP_CLOUDFLARE.md § G](docs/setup/SETUP_CLOUDFLARE.md#g-production-deployment-after-sections-ac-with-your-approval). In short:
+   [[env.production.d1_databases]]
+   database_id = "<database_id from step 2>"
+   ```
+   Also set the same `GOOGLE_CLIENT_ID` in the top `[vars]` section, which local development uses.
+5. **Create the tables** (from the repository root):
+   ```sh
+   npm run db:migrate:prod --workspace backend
+   ```
+6. **Set the two secrets.** Generate a random value for each and paste it when prompted. Secrets are never stored in files or Git.
+   ```sh
+   cd backend
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"   # run twice: one value per secret
+   npx wrangler secret put SESSION_SIGNING_KEY --env production
+   npx wrangler secret put IP_HASH_SALT --env production
+   cd ..
+   ```
+   (`ALLOWED_GOOGLE_SUBS` is set in Part G, once you know your account ID.)
+7. **Deploy:**
+   ```sh
+   npm run deploy --workspace backend
+   ```
+   This first runs a safety check that refuses placeholder values, then deploys.
+8. **Verify:** open `https://t.<subdomain>.workers.dev/health` in the browser.
+   ✅ You should see `{"status":"ok","service":"tracklet-backend",…}`.
 
-```sh
-cd backend && npx wrangler login && npx wrangler d1 create tracklet && cd ..
-#  → put database_id and PUBLIC_BASE_URL (https://t.<subdomain>.workers.dev) in backend/wrangler.toml [env.production]
-npm run db:migrate:prod --workspace backend
-#  → set secrets: npx wrangler secret put SESSION_SIGNING_KEY | IP_HASH_SALT | ALLOWED_GOOGLE_SUBS --env production (run in backend/)
-#  → create extension/.env.release.local with TRACKLET_OAUTH_CLIENT_ID and TRACKLET_API_BASE=<same https URL>
-npm run preflight                      # must print "preflight: ready"
-npm run deploy --workspace backend     # preflight + wrangler deploy --env production
-npm run release                        # check + preflight + production extension build
-```
+### Part E — Build the extension
 
-### 5. Build and load the extension
+1. Create **`extension/.env.release.local`**. It is gitignored. It should contain:
+   ```
+   TRACKLET_OAUTH_CLIENT_ID=<your client ID from Part C>
+   TRACKLET_API_BASE=https://t.<subdomain>.workers.dev
+   ```
+2. Run the production check:
+   ```sh
+   npm run preflight
+   ```
+   ✅ It must end with **`preflight: ready`**. If not, it lists exactly what to fix: placeholder, http URL, mismatched client ID, and so on.
+3. Build:
+   ```sh
+   npm run release
+   ```
+   ✅ The production extension is in **`extension/dist`**.
 
-```sh
-npm run build --workspace extension
-```
+### Part F — Load the extension in Chrome
 
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. Click **Load unpacked** and choose `extension/dist`.
-3. Check that the ID shown is `hhejoehmmjbjahinnpgnfhfakbkhilcd`.
-4. Reload any open Gmail tabs.
+1. Open **`chrome://extensions`**.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and select the **`extension/dist`** folder.
+4. ✅ Check that the ID under *Tracklet* is **`hhejoehmmjbjahinnpgnfhfakbkhilcd`**.
+5. Pin Tracklet: click the puzzle icon in the toolbar, then the pin next to Tracklet.
+6. Reload any open Gmail tabs.
 
-After every rebuild, click the extension's reload icon and reload Gmail.
+> After every rebuild, click the ↻ reload icon on the Tracklet card, then reload Gmail.
 
-### 6. Sign in and allow your account
+### Part G — Sign in and allow your account
 
-1. Click the Tracklet toolbar icon, then **Sign in with Google**, and approve.
-2. The first time, the popup says **"This Google account is not allowed"**. This is expected, because the backend allowlist starts empty, which allows nobody.
-3. Click **Show my Google account ID**. It shows the exact value the backend checks: your Google account ID, not your email.
-4. Put that value in the backend allowlist:
-   - **local:** in `backend/.dev.vars`, write `ALLOWED_GOOGLE_SUBS=<value>`. Use no quotes; separate several accounts with commas. **Save the file** and restart `npm run dev --workspace backend`;
-   - **deployed:** run `npx wrangler secret put ALLOWED_GOOGLE_SUBS`.
-5. Click **Retry** in the popup. It should show your email address.
+The backend allows nobody until you add your Google account ID. This is a one-time step.
+
+1. Click the Tracklet toolbar icon, then **Sign in with Google**.
+2. Google shows *"Google hasn't verified this app"*. This is normal for a personal app in Testing mode. Click **Advanced → Go to Tracklet (unsafe)**, then **Continue**.
+3. The popup now says **"This Google account is not allowed"**. This is expected.
+4. Click **Show my Google account ID**. ✅ Copy the value shown: a long string, **not** your email.
+5. Save it on the backend, pasting the value when prompted:
+   ```sh
+   cd backend
+   npx wrangler secret put ALLOWED_GOOGLE_SUBS --env production
+   cd ..
+   ```
+   For several accounts, separate the IDs with commas.
+6. In the popup, click **Retry**. ✅ It shows your email address and the 7-day summary.
+
+### Part H — Send your first tracked email
+
+1. Open Gmail and click **Compose**.
+2. Enter an address you can open (for example another Gmail of yours), a subject and some text. A link is optional.
+3. Click **Preview tracking**. It shows what will be sent and **sends nothing**.
+4. Click **Send tracked**, next to Gmail's blue Send button.
+   ✅ A green note says *"Sent 1 tracked copy"*.
+5. Wait **at least 15 seconds**. Opens in the first seconds after sending are treated as automatic scanning. Then open the email in the recipient's inbox.
+6. Within about a minute you get a desktop notification. ✅ The popup shows **Opened: 1**. Click **Open dashboard** for the details.
+
+**Verify on the server (optional).** Run `cd backend && npx wrangler tail --env production` to watch live logs. A `[tracklet-track] {"type":"open","token_known":true,…}` line confirms the open arrived. The logs never contain tokens or email addresses.
+
+**You're done.** From now on, use **Send tracked** for messages you want to track and the normal **Send** for everything else.
+
+---
+
+### Local-only mode (no deployment)
+
+Use this to try the interface, sign-in and **Preview tracking** without Cloudflare. **Real emails cannot be tracked this way:** Gmail loads images through Google's servers, which can't reach your PC. Tracklet therefore refuses **Send tracked** in this mode, with an explanation.
+
+1. Complete parts A–C.
+2. Set up the local backend config and database:
+   ```sh
+   cp backend/.dev.vars.example backend/.dev.vars
+   # Edit backend/.dev.vars: SESSION_SIGNING_KEY and IP_HASH_SALT = random values (command in Part D step 6)
+   npm run db:migrate:local --workspace backend
+   ```
+3. Start the backend, and keep this terminal open:
+   ```sh
+   npm run dev --workspace backend
+   ```
+   ✅ It prints `Ready on http://127.0.0.1:8787`.
+4. Create **`extension/.env.local`** containing `TRACKLET_OAUTH_CLIENT_ID=<client ID>` and `TRACKLET_API_BASE=http://127.0.0.1:8787`. Then build with `npm run build --workspace extension`.
+5. Do Part F.
+6. Do Part G, but save the ID in **`backend/.dev.vars`** as `ALLOWED_GOOGLE_SUBS=<value>` (no quotes). **Save the file**, then restart step 3.
 
 ### Daily use
 
@@ -201,8 +312,8 @@ After every rebuild, click the extension's reload icon and reload Gmail.
 | Symptom | Cause and fix |
 |---|---|
 | "Can't reach the Tracklet server at …" | The backend isn't running, or `TRACKLET_API_BASE` is wrong. Start the backend, or fix `.env.local` and rebuild. |
-| "This Google account is not allowed" | Your account ID isn't in `ALLOWED_GOOGLE_SUBS`. Follow [step 6](#6-sign-in-and-allow-your-account). The wrangler terminal prints `[tracklet-auth]` lines that name the failing stage. |
-| "Not sent. Tracking URLs point to http://127.0.0.1:8787…" | The backend isn't publicly reachable over https, so opens could never be recorded. Deploy it ([step 4](#4-run-the-backend)). |
+| "This Google account is not allowed" | Your account ID isn't in `ALLOWED_GOOGLE_SUBS`. Follow [Part G](#part-g--sign-in-and-allow-your-account). The wrangler terminal prints `[tracklet-auth]` lines that name the failing stage. |
+| "Not sent. Tracking URLs point to http://127.0.0.1:8787…" | The backend isn't publicly reachable over https, so opens could never be recorded. Deploy it ([Part D](#part-d--deploy-the-backend-to-cloudflare)). |
 | "Google sign-in is misconfigured" | The OAuth client ID or extension ID doesn't match the Chrome Extension client in Google Cloud. |
 | "Sign in to Tracklet (open the popup)" in Gmail | There's no valid session. Sign in from the popup; Gmail itself can't start sign-in. |
 | No **Send tracked** button | It appears only on **new** messages. Reload Gmail after installing or reloading the extension. |
